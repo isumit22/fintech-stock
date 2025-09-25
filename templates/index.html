@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚀 Stock Trend Predictor - Live Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            color: white;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: rgba(0,0,0,0.2);
+            padding: 1rem 2rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .header .subtitle {
+            opacity: 0.8;
+            font-size: 1rem;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto auto auto;
+            gap: 2rem;
+            height: calc(100vh - 120px);
+        }
+        
+        .card {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 1.5rem;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        
+        .card h3 {
+            margin-bottom: 1rem;
+            color: #ffd700;
+            font-size: 1.2rem;
+        }
+        
+        .controls {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .controls select, .controls button {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+        
+        .controls button {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .controls button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(238,90,82,0.4);
+        }
+        
+        .controls button.stop {
+            background: linear-gradient(45deg, #555, #666);
+        }
+        
+        .status {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: bold;
+            margin-left: auto;
+        }
+        
+        .status.connected {
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+        }
+        
+        .status.disconnected {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+        }
+        
+        .current-data {
+            text-align: center;
+        }
+        
+        .price {
+            font-size: 3rem;
+            font-weight: bold;
+            margin: 1rem 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        
+        .price.up {
+            color: #4ade80;
+        }
+        
+        .price.down {
+            color: #f87171;
+        }
+        
+        .price.neutral {
+            color: #fbbf24;
+        }
+        
+        .prediction {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 1rem 0;
+            padding: 1rem;
+            border-radius: 10px;
+            text-transform: uppercase;
+        }
+        
+        .prediction.up {
+            background: linear-gradient(45deg, #4ade80, #22c55e);
+        }
+        
+        .prediction.down {
+            background: linear-gradient(45deg, #f87171, #ef4444);
+        }
+        
+        .prediction.neutral {
+            background: linear-gradient(45deg, #fbbf24, #f59e0b);
+        }
+        
+        .confidence {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 100%;
+        }
+        
+        .metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            text-align: center;
+        }
+        
+        .metric {
+            background: rgba(255,255,255,0.1);
+            padding: 1rem;
+            border-radius: 10px;
+        }
+        
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #ffd700;
+        }
+        
+        .metric-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-top: 0.5rem;
+        }
+        
+        .features {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .feature-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 0.5rem 0;
+            padding: 0.5rem;
+            background: rgba(255,255,255,0.05);
+            border-radius: 5px;
+        }
+        
+        .log {
+            max-height: 200px;
+            overflow-y: auto;
+            background: rgba(0,0,0,0.3);
+            padding: 1rem;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+        
+        .log-entry {
+            margin: 0.25rem 0;
+            opacity: 0.9;
+        }
+        
+        .timestamp {
+            color: #888;
+            margin-right: 0.5rem;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+                padding: 1rem;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .price {
+                font-size: 2rem;
+            }
+            
+            .prediction {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚀 Stock Trend Predictor</h1>
+        <div class="subtitle">Real-time AI-powered stock trend predictions with live market data</div>
+    </div>
+
+    <div class="container">
+        <!-- Controls -->
+        <div class="card controls">
+            <label for="symbolSelect">Select Symbol:</label>
+            <select id="symbolSelect">
+                <option value="">Choose a stock...</option>
+                <option value="AAPL">AAPL - Apple Inc.</option>
+                <option value="MSFT">MSFT - Microsoft Corp.</option>
+                <option value="GOOGL">GOOGL - Alphabet Inc.</option>
+                <option value="AMZN">AMZN - Amazon.com Inc.</option>
+                <option value="TSLA">TSLA - Tesla Inc.</option>
+                <option value="NVDA">NVDA - NVIDIA Corp.</option>
+                <option value="META">META - Meta Platforms</option>
+                <option value="NFLX">NFLX - Netflix Inc.</option>
+                <option value="DIS">DIS - Walt Disney Co.</option>
+                <option value="UBER">UBER - Uber Technologies</option>
+            </select>
+            <button id="startBtn" onclick="startPrediction()">🚀 Start Prediction</button>
+            <button id="stopBtn" onclick="stopPrediction()" class="stop" style="display: none;">⏹️ Stop</button>
+            <div id="status" class="status disconnected">Disconnected</div>
+        </div>
+
+        <!-- Current Data -->
+        <div class="card current-data">
+            <h3>📊 Live Market Data</h3>
+            <div id="symbolName">Select a symbol to start</div>
+            <div id="currentPrice" class="price neutral">$---.--</div>
+            <div id="timestamp">--:--:-- --</div>
+            <div id="volume">Volume: ---</div>
+        </div>
+
+        <!-- Prediction -->
+        <div class="card">
+            <h3>🔮 AI Prediction</h3>
+            <div id="prediction" class="prediction neutral">
+                WAITING
+            </div>
+            <div id="confidence" class="confidence">
+                Confidence: --%
+            </div>
+            <div id="predictionTime">
+                Next 5-minute trend forecast
+            </div>
+        </div>
+
+        <!-- Price Chart -->
+        <div class="card">
+            <h3>📈 Price Chart (Real-time)</h3>
+            <div class="chart-container">
+                <canvas id="priceChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Performance Metrics -->
+        <div class="card">
+            <h3>🎯 Performance Metrics</h3>
+            <div class="metrics">
+                <div class="metric">
+                    <div id="accuracy" class="metric-value">--%</div>
+                    <div class="metric-label">Accuracy</div>
+                </div>
+                <div class="metric">
+                    <div id="totalPredictions" class="metric-value">0</div>
+                    <div class="metric-label">Predictions</div>
+                </div>
+                <div class="metric">
+                    <div id="correctPredictions" class="metric-value">0</div>
+                    <div class="metric-label">Correct</div>
+                </div>
+                <div class="metric">
+                    <div id="lastUpdate" class="metric-value">Never</div>
+                    <div class="metric-label">Last Update</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Technical Features -->
+        <div class="card">
+            <h3>🔧 Technical Indicators</h3>
+            <div id="features" class="features">
+                <div class="feature-item">
+                    <span>Select a symbol to see technical indicators</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let socket = null;
+        let priceChart = null;
+        let isRunning = false;
+        let currentSymbol = '';
+
+        // Initialize the dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeWebSocket();
+            initializePriceChart();
+        });
+
+        function initializeWebSocket() {
+            socket = io();
+            
+            socket.on('connect', function() {
+                updateStatus('Connected', 'connected');
+                console.log('Connected to server');
+            });
+
+            socket.on('disconnect', function() {
+                updateStatus('Disconnected', 'disconnected');
+                console.log('Disconnected from server');
+            });
+
+            socket.on('market_update', function(data) {
+                updateDashboard(data);
+            });
+        }
+
+        function initializePriceChart() {
+            const ctx = document.getElementById('priceChart').getContext('2d');
+            priceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Price ($)',
+                        data: [],
+                        borderColor: '#ffd700',
+                        backgroundColor: 'rgba(255, 215, 0, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: 'white'
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                color: 'white',
+                                maxTicksLimit: 10
+                            },
+                            grid: {
+                                color: 'rgba(255,255,255,0.1)'
+                            }
+                        },
+                        y: {
+                            ticks: {
+                                color: 'white'
+                            },
+                            grid: {
+                                color: 'rgba(255,255,255,0.1)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function startPrediction() {
+            const symbol = document.getElementById('symbolSelect').value;
+            if (!symbol) {
+                alert('Please select a symbol first!');
+                return;
+            }
+
+            fetch(`/api/start/${symbol}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        isRunning = true;
+                        currentSymbol = symbol;
+                        document.getElementById('startBtn').style.display = 'none';
+                        document.getElementById('stopBtn').style.display = 'inline-block';
+                        document.getElementById('symbolName').textContent = symbol;
+                        updateStatus('Running', 'connected');
+                        
+                        // Clear previous data
+                        priceChart.data.labels = [];
+                        priceChart.data.datasets[0].data = [];
+                        priceChart.update();
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error starting prediction:', error);
+                    alert('Failed to start prediction');
+                });
+        }
+
+        function stopPrediction() {
+            fetch('/api/stop')
+                .then(response => response.json())
+                .then(data => {
+                    isRunning = false;
+                    currentSymbol = '';
+                    document.getElementById('startBtn').style.display = 'inline-block';
+                    document.getElementById('stopBtn').style.display = 'none';
+                    updateStatus('Stopped', 'disconnected');
+                })
+                .catch(error => {
+                    console.error('Error stopping prediction:', error);
+                });
+        }
+
+        function updateDashboard(data) {
+            // Update price
+            const priceElement = document.getElementById('currentPrice');
+            priceElement.textContent = `$${data.price.toFixed(2)}`;
+            priceElement.className = `price ${data.prediction.toLowerCase()}`;
+
+            // Update timestamp
+            const timestamp = new Date(data.timestamp);
+            document.getElementById('timestamp').textContent = timestamp.toLocaleTimeString();
+
+            // Update volume
+            document.getElementById('volume').textContent = `Volume: ${data.volume.toLocaleString()}`;
+
+            // Update prediction
+            const predictionElement = document.getElementById('prediction');
+            predictionElement.textContent = data.prediction;
+            predictionElement.className = `prediction ${data.prediction.toLowerCase()}`;
+
+            // Update confidence
+            document.getElementById('confidence').textContent = 
+                `Confidence: ${(data.confidence * 100).toFixed(1)}%`;
+
+            // Update performance metrics
+            if (data.performance) {
+                document.getElementById('accuracy').textContent = 
+                    `${(data.performance.accuracy * 100).toFixed(1)}%`;
+                document.getElementById('totalPredictions').textContent = 
+                    data.performance.total_predictions;
+                document.getElementById('correctPredictions').textContent = 
+                    data.performance.correct_predictions;
+            }
+            
+            document.getElementById('lastUpdate').textContent = 
+                timestamp.toLocaleTimeString();
+
+            // Update technical features
+            updateFeatures(data.features);
+
+            // Update chart
+            updateChart(data);
+        }
+
+        function updateFeatures(features) {
+            if (!features) return;
+
+            const featuresContainer = document.getElementById('features');
+            featuresContainer.innerHTML = '';
+
+            Object.entries(features).forEach(([key, value]) => {
+                const featureDiv = document.createElement('div');
+                featureDiv.className = 'feature-item';
+                
+                let displayValue;
+                if (typeof value === 'number') {
+                    displayValue = value.toFixed(4);
+                } else {
+                    displayValue = value.toString();
+                }
+
+                featureDiv.innerHTML = `
+                    <span>${key.replace(/_/g, ' ').toUpperCase()}</span>
+                    <span>${displayValue}</span>
+                `;
+                featuresContainer.appendChild(featureDiv);
+            });
+        }
+
+        function updateChart(data) {
+            const timestamp = new Date(data.timestamp);
+            const timeLabel = timestamp.toLocaleTimeString();
+
+            // Add new data point
+            priceChart.data.labels.push(timeLabel);
+            priceChart.data.datasets[0].data.push(data.price);
+
+            // Keep only last 20 points
+            if (priceChart.data.labels.length > 20) {
+                priceChart.data.labels.shift();
+                priceChart.data.datasets[0].data.shift();
+            }
+
+            priceChart.update('none');
+        }
+
+        function updateStatus(message, className) {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = message;
+            statusElement.className = `status ${className}`;
+        }
+    </script>
+</body>
+</html>

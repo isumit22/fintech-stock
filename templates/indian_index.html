@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>📊 Indian Stock Trend Predictor - NSE/BSE Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+    <!-- Force CSS refresh with timestamp -->
+    <style id="main-styles-v2024092422">
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+            color: white;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: rgba(0,0,0,0.4);
+            padding: 1rem 2rem;
+            border-bottom: 2px solid #00d4aa;
+        }
+        
+        .header h1 {
+            font-size: 2.2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .header .subtitle {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto auto auto;
+            gap: 2rem;
+            min-height: calc(100vh - 120px);
+        }
+        
+        .card {
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 1.5rem;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        }
+        
+        .card h3 {
+            margin-bottom: 1rem;
+            color: #00d4aa;
+            font-size: 1.3rem;
+        }
+        
+        .controls {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .controls select, .controls button {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.4);
+            color: white;
+            padding: 0.6rem 1.2rem;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+        
+        .controls select {
+            min-width: 250px;
+        }
+        
+        .controls button {
+            background: linear-gradient(45deg, #00d4aa, #007a6b);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+        }
+        
+        .controls button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,212,170,0.5);
+        }
+        
+        .controls button.stop {
+            background: linear-gradient(45deg, #ff4757, #c44569);
+        }
+        
+        .status {
+            padding: 0.6rem 1.2rem;
+            border-radius: 25px;
+            font-weight: bold;
+            margin-left: auto;
+        }
+        
+        .status.connected {
+            background: linear-gradient(45deg, #00ff88, #00d4aa);
+        }
+        
+        .status.disconnected {
+            background: linear-gradient(45deg, #ff4757, #c44569);
+        }
+        
+        .current-data {
+            text-align: center;
+        }
+        
+        .symbol-info {
+            margin-bottom: 1rem;
+        }
+        
+        .symbol-name {
+            font-size: 1.2rem;
+            color: #00d4aa;
+            margin-bottom: 0.5rem;
+        }
+        
+        .exchange-badge {
+            background: #007a6b;
+            color: white;
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+        
+        .price {
+            font-size: 3.5rem;
+            font-weight: bold;
+            margin: 1rem 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        
+        .price.up {
+            color: #00ff88;
+        }
+        
+        .price.down {
+            color: #ff4757;
+        }
+        
+        .price.neutral {
+            color: #ffd700;
+        }
+        
+        .price-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 1rem;
+            margin: 1rem 0;
+            font-size: 0.9rem;
+        }
+        
+        .price-item {
+            text-align: center;
+        }
+        
+        .prediction {
+            font-size: 2.2rem;
+            font-weight: bold;
+            margin: 1rem 0;
+            padding: 1.2rem;
+            border-radius: 12px;
+            text-transform: uppercase;
+        }
+        
+        .prediction.up {
+            background: linear-gradient(45deg, #00ff88, #00d4aa);
+        }
+        
+        .prediction.down {
+            background: linear-gradient(45deg, #ff4757, #c44569);
+        }
+        
+        .prediction.neutral {
+            background: linear-gradient(45deg, #ffd700, #f39c12);
+        }
+        
+        .confidence {
+            font-size: 1.3rem;
+            opacity: 0.9;
+            margin-bottom: 0.5rem;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+        
+        .chart-container canvas {
+            max-height: 300px;
+        }
+        
+        .metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            text-align: center;
+        }
+        
+        .metric {
+            background: rgba(255,255,255,0.1);
+            padding: 1rem;
+            border-radius: 10px;
+        }
+        
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #00d4aa;
+        }
+        
+        .metric-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-top: 0.5rem;
+        }
+        
+        .features {
+            max-height: 350px;
+            overflow-y: auto;
+        }
+        
+        .feature-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 0.5rem 0;
+            padding: 0.6rem;
+            background: rgba(255,255,255,0.08);
+            border-radius: 8px;
+            border-left: 3px solid #00d4aa;
+        }
+        
+        .feature-label {
+            font-weight: 500;
+        }
+        
+        .feature-value {
+            font-family: 'Courier New', monospace;
+            color: #00d4aa;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+                padding: 1rem;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .controls select {
+                min-width: unset;
+            }
+            
+            .price {
+                font-size: 2.5rem;
+            }
+            
+            .prediction {
+                font-size: 1.8rem;
+            }
+            
+            .price-details {
+                grid-template-columns: 1fr;
+                gap: 0.5rem;
+            }
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 Indian Stock Trend Predictor</h1>
+        <div class="subtitle">Real-time AI-powered predictions for NSE & BSE stocks with live market data</div>
+    </div>
+
+    <div class="container">
+        <!-- Controls -->
+        <div class="card controls">
+            <label for="symbolSelect">Select Indian Stock:</label>
+            <select id="symbolSelect">
+                <option value="">Choose an Indian stock...</option>
+                <option value="RELIANCE.NS">RELIANCE.NS - Reliance Industries (NSE)</option>
+                <option value="TCS.NS">TCS.NS - Tata Consultancy Services (NSE)</option>
+                <option value="HDFCBANK.NS">HDFCBANK.NS - HDFC Bank (NSE)</option>
+                <option value="INFY.NS">INFY.NS - Infosys (NSE)</option>
+                <option value="HINDUNILVR.NS">HINDUNILVR.NS - Hindustan Unilever (NSE)</option>
+                <option value="ICICIBANK.NS">ICICIBANK.NS - ICICI Bank (NSE)</option>
+                <option value="SBIN.NS">SBIN.NS - State Bank of India (NSE)</option>
+                <option value="BHARTIARTL.NS">BHARTIARTL.NS - Bharti Airtel (NSE)</option>
+                <option value="ASIANPAINT.NS">ASIANPAINT.NS - Asian Paints (NSE)</option>
+                <option value="MARUTI.NS">MARUTI.NS - Maruti Suzuki (NSE)</option>
+                <option value="KOTAKBANK.NS">KOTAKBANK.NS - Kotak Mahindra Bank (NSE)</option>
+                <option value="LT.NS">LT.NS - Larsen & Toubro (NSE)</option>
+                <option value="ADANIENTERPRISE.NS">ADANIENTERPRISE.NS - Adani Enterprises (NSE)</option>
+                <option value="TATAMOTORS.NS">TATAMOTORS.NS - Tata Motors (NSE)</option>
+                <option value="SUNPHARMA.NS">SUNPHARMA.NS - Sun Pharmaceutical (NSE)</option>
+            </select>
+            <button id="startBtn" onclick="startPrediction()">🚀 Start Prediction</button>
+            <button id="stopBtn" onclick="stopPrediction()" class="stop" style="display: none;">⏹️ Stop</button>
+            <div id="status" class="status disconnected">Disconnected</div>
+        </div>
+
+        <!-- Current Data -->
+        <div class="card current-data">
+            <h3>📊 Live Indian Market Data</h3>
+            <div class="symbol-info">
+                <div id="symbolName" class="symbol-name">Select an Indian stock to start</div>
+                <div id="exchangeBadge" class="exchange-badge" style="display: none;">NSE</div>
+            </div>
+            <div id="currentPrice" class="price neutral">₹---.--</div>
+            <div class="price-details">
+                <div class="price-item">
+                    <div>Open</div>
+                    <div id="openPrice">₹---</div>
+                </div>
+                <div class="price-item">
+                    <div>High</div>
+                    <div id="highPrice">₹---</div>
+                </div>
+                <div class="price-item">
+                    <div>Low</div>
+                    <div id="lowPrice">₹---</div>
+                </div>
+            </div>
+            <div id="timestamp">--:--:-- --</div>
+            <div id="volume">Volume: ---</div>
+            <div id="marketInfo" style="font-size: 0.9rem; margin-top: 1rem; opacity: 0.8;"></div>
+        </div>
+
+        <!-- Prediction -->
+        <div class="card">
+            <h3>🔮 AI Prediction</h3>
+            <div id="prediction" class="prediction neutral">
+                WAITING
+            </div>
+            <div id="confidence" class="confidence">
+                Confidence: --%
+            </div>
+            <div id="predictionTime" style="text-align: center; opacity: 0.8;">
+                Next 5-minute trend forecast for Indian markets
+            </div>
+        </div>
+
+        <!-- Price Chart -->
+        <div class="card">
+            <h3>📈 Price Chart (Real-time INR)</h3>
+            <div class="chart-container">
+                <canvas id="priceChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Performance Metrics -->
+        <div class="card">
+            <h3>🎯 Performance Metrics</h3>
+            <div class="metrics">
+                <div class="metric">
+                    <div id="accuracy" class="metric-value">--%</div>
+                    <div class="metric-label">Accuracy</div>
+                </div>
+                <div class="metric">
+                    <div id="totalPredictions" class="metric-value">0</div>
+                    <div class="metric-label">Predictions</div>
+                </div>
+                <div class="metric">
+                    <div id="correctPredictions" class="metric-value">0</div>
+                    <div class="metric-label">Correct</div>
+                </div>
+                <div class="metric">
+                    <div id="lastUpdate" class="metric-value">Never</div>
+                    <div class="metric-label">Last Update</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Technical Features -->
+        <div class="card">
+            <h3>🔧 Technical Indicators (INR)</h3>
+            <div id="features" class="features">
+                <div class="loading">
+                    Select an Indian stock to see technical indicators
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let socket = null;
+        let priceChart = null;
+        let isRunning = false;
+        let currentSymbol = '';
+
+        // Initialize the dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeWebSocket();
+            initializePriceChart();
+        });
+
+        function initializeWebSocket() {
+            socket = io();
+            
+            socket.on('connect', function() {
+                updateStatus('Connected to NSE/BSE', 'connected');
+                console.log('Connected to Indian stocks server');
+            });
+
+            socket.on('disconnect', function() {
+                updateStatus('Disconnected', 'disconnected');
+                console.log('Disconnected from Indian stocks server');
+            });
+
+            socket.on('market_update', function(data) {
+                updateDashboard(data);
+            });
+        }
+
+        function initializePriceChart() {
+            const ctx = document.getElementById('priceChart').getContext('2d');
+            priceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Price (₹)',
+                        data: [],
+                        borderColor: '#00d4aa',
+                        backgroundColor: 'rgba(0, 212, 170, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: 'white',
+                                font: {
+                                    size: 14
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                color: 'white',
+                                maxTicksLimit: 8
+                            },
+                            grid: {
+                                color: 'rgba(255,255,255,0.2)'
+                            }
+                        },
+                        y: {
+                            ticks: {
+                                color: 'white',
+                                callback: function(value) {
+                                    return '₹' + value.toFixed(2);
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(255,255,255,0.2)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function startPrediction() {
+            const symbol = document.getElementById('symbolSelect').value;
+            if (!symbol) {
+                alert('Please select an Indian stock first!');
+                return;
+            }
+
+            fetch(`/api/start/${symbol}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        isRunning = true;
+                        currentSymbol = symbol;
+                        document.getElementById('startBtn').style.display = 'none';
+                        document.getElementById('stopBtn').style.display = 'inline-block';
+                        
+                        // Update UI
+                        const symbolText = symbol.split('.')[0];
+                        document.getElementById('symbolName').textContent = symbolText;
+                        document.getElementById('exchangeBadge').textContent = 'NSE';
+                        document.getElementById('exchangeBadge').style.display = 'inline-block';
+                        
+                        updateStatus('Running (Indian Markets)', 'connected');
+                        
+                        // Clear previous data
+                        priceChart.data.labels = [];
+                        priceChart.data.datasets[0].data = [];
+                        priceChart.update();
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error starting prediction:', error);
+                    alert('Failed to start prediction');
+                });
+        }
+
+        function stopPrediction() {
+            fetch('/api/stop')
+                .then(response => response.json())
+                .then(data => {
+                    isRunning = false;
+                    currentSymbol = '';
+                    document.getElementById('startBtn').style.display = 'inline-block';
+                    document.getElementById('stopBtn').style.display = 'none';
+                    document.getElementById('exchangeBadge').style.display = 'none';
+                    updateStatus('Stopped', 'disconnected');
+                })
+                .catch(error => {
+                    console.error('Error stopping prediction:', error);
+                });
+        }
+
+        function updateDashboard(data) {
+            // Update price with Indian Rupee symbol
+            const priceElement = document.getElementById('currentPrice');
+            priceElement.textContent = `₹${data.price.toFixed(2)}`;
+            priceElement.className = `price ${data.prediction.toLowerCase()}`;
+
+            // Update price details
+            document.getElementById('openPrice').textContent = `₹${data.open.toFixed(2)}`;
+            document.getElementById('highPrice').textContent = `₹${data.high.toFixed(2)}`;
+            document.getElementById('lowPrice').textContent = `₹${data.low.toFixed(2)}`;
+
+            // Update timestamp
+            const timestamp = new Date(data.timestamp);
+            document.getElementById('timestamp').textContent = timestamp.toLocaleTimeString('en-IN');
+
+            // Update volume
+            document.getElementById('volume').textContent = `Volume: ${data.volume.toLocaleString('en-IN')}`;
+
+            // Update market info
+            let marketInfo = '';
+            if (data.sector && data.sector !== 'N/A') {
+                marketInfo += `Sector: ${data.sector} | `;
+            }
+            if (data.pe_ratio && data.pe_ratio !== 'N/A') {
+                marketInfo += `P/E: ${data.pe_ratio}`;
+            }
+            document.getElementById('marketInfo').textContent = marketInfo;
+
+            // Update prediction
+            const predictionElement = document.getElementById('prediction');
+            predictionElement.textContent = data.prediction;
+            predictionElement.className = `prediction ${data.prediction.toLowerCase()}`;
+
+            // Update confidence
+            document.getElementById('confidence').textContent = 
+                `Confidence: ${(data.confidence * 100).toFixed(1)}%`;
+
+            // Update performance metrics
+            if (data.performance) {
+                document.getElementById('accuracy').textContent = 
+                    `${(data.performance.accuracy * 100).toFixed(1)}%`;
+                document.getElementById('totalPredictions').textContent = 
+                    data.performance.total_predictions;
+                document.getElementById('correctPredictions').textContent = 
+                    data.performance.correct_predictions;
+            }
+            
+            document.getElementById('lastUpdate').textContent = 
+                timestamp.toLocaleTimeString('en-IN');
+
+            // Update technical features
+            updateFeatures(data.features);
+
+            // Update chart
+            updateChart(data);
+        }
+
+        function updateFeatures(features) {
+            if (!features) return;
+
+            const featuresContainer = document.getElementById('features');
+            featuresContainer.innerHTML = '';
+
+            // Define feature display names for Indian context
+            const featureLabels = {
+                'price_inr': 'Current Price (₹)',
+                'ma_5': 'MA 5 (₹)',
+                'ma_10': 'MA 10 (₹)',
+                'ma_20': 'MA 20 (₹)',
+                'return_1period': 'Return 1-Period (%)',
+                'return_5period': 'Return 5-Period (%)',
+                'return_10period': 'Return 10-Period (%)',
+                'volatility': 'Volatility',
+                'rsi': 'RSI',
+                'volume_ratio': 'Volume Ratio',
+                'high_low_ratio': 'High-Low Ratio',
+                'day_position': 'Day Position',
+                'price_ma5_ratio': 'Price/MA5 Ratio',
+                'ma5_ma20_ratio': 'MA5/MA20 Ratio'
+            };
+
+            Object.entries(features).forEach(([key, value]) => {
+                const featureDiv = document.createElement('div');
+                featureDiv.className = 'feature-item';
+                
+                const label = featureLabels[key] || key.replace(/_/g, ' ').toUpperCase();
+                let displayValue;
+                
+                if (typeof value === 'number') {
+                    if (key.includes('return')) {
+                        displayValue = `${(value * 100).toFixed(3)}%`;
+                    } else if (key.includes('price') && !key.includes('ratio')) {
+                        displayValue = `₹${value.toFixed(2)}`;
+                    } else {
+                        displayValue = value.toFixed(4);
+                    }
+                } else {
+                    displayValue = value.toString();
+                }
+
+                featureDiv.innerHTML = `
+                    <span class="feature-label">${label}</span>
+                    <span class="feature-value">${displayValue}</span>
+                `;
+                featuresContainer.appendChild(featureDiv);
+            });
+        }
+
+        function updateChart(data) {
+            const timestamp = new Date(data.timestamp);
+            const timeLabel = timestamp.toLocaleTimeString('en-IN');
+
+            // Add new data point
+            priceChart.data.labels.push(timeLabel);
+            priceChart.data.datasets[0].data.push(data.price);
+
+            // Keep only last 15 points for better visibility
+            if (priceChart.data.labels.length > 15) {
+                priceChart.data.labels.shift();
+                priceChart.data.datasets[0].data.shift();
+            }
+
+            priceChart.update('none');
+        }
+
+        function updateStatus(message, className) {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = message;
+            statusElement.className = `status ${className}`;
+        }
+    </script>
+</body>
+</html>
