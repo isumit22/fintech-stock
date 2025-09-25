@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fintech Stock Predictor - Enhanced</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.4/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header .subtitle {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .control-panel {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .stock-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        
+        .quick-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .stock-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .stock-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        .stock-btn.active {
+            background: #4CAF50;
+            border-color: #4CAF50;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+        }
+        
+        input[type="text"] {
+            padding: 12px 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 25px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 16px;
+            min-width: 200px;
+        }
+        
+        input[type="text"]::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+        
+        .btn {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+        }
+        
+        .btn.stop {
+            background: linear-gradient(45deg, #f44336, #d32f2f);
+            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3);
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        
+        @media (max-width: 1024px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 25px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .card h2 {
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            text-align: center;
+        }
+        
+        .price-display {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .current-price {
+            font-size: 3em;
+            font-weight: bold;
+            margin: 10px 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .symbol {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
+        
+        .market-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .detail-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .detail-label {
+            font-size: 0.9em;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+        
+        .detail-value {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+        
+        .prediction-panel {
+            text-align: center;
+        }
+        
+        .prediction-result {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 15px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .prediction-UP {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+        }
+        
+        .prediction-DOWN {
+            background: linear-gradient(45deg, #f44336, #d32f2f);
+            color: white;
+        }
+        
+        .prediction-NEUTRAL {
+            background: linear-gradient(45deg, #FF9800, #F57C00);
+            color: white;
+        }
+        
+        .confidence-bar {
+            width: 100%;
+            height: 30px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+        
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #45a049);
+            transition: width 0.3s ease;
+            border-radius: 15px;
+        }
+        
+        .performance-section {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 25px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            margin-bottom: 30px;
+        }
+        
+        .performance-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        
+        .perf-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .perf-number {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .perf-label {
+            opacity: 0.8;
+            font-size: 0.9em;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-left: 10px;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-running {
+            background: #4CAF50;
+        }
+        
+        .status-stopped {
+            background: #f44336;
+        }
+        
+        .status-warming {
+            background: #FF9800;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .disclaimer {
+            background: rgba(255, 193, 7, 0.2);
+            border: 2px solid rgba(255, 193, 7, 0.5);
+            padding: 20px;
+            border-radius: 15px;
+            margin-top: 30px;
+            text-align: center;
+        }
+        
+        .disclaimer strong {
+            color: #FFD700;
+        }
+        
+        .system-info {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+        
+        .log-container {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.8em;
+            margin-top: 15px;
+        }
+        
+        .log-entry {
+            margin: 2px 0;
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+        
+        .log-info { background: rgba(76, 175, 80, 0.2); }
+        .log-error { background: rgba(244, 67, 54, 0.2); }
+        .log-warning { background: rgba(255, 152, 0, 0.2); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏦 Fintech Stock Predictor - Enhanced</h1>
+            <div class="subtitle">Professional-grade real-time predictions with advanced analytics</div>
+        </div>
+        
+        <div class="control-panel">
+            <div class="stock-controls">
+                <input type="text" id="stockSymbol" placeholder="Enter stock symbol (e.g., RELIANCE, TCS)" value="KOTAKBANK">
+                <button class="btn" onclick="startPrediction()">Start Prediction</button>
+                <button class="btn stop" onclick="stopPrediction()">Stop</button>
+            </div>
+            
+            <div class="quick-buttons">
+                <button class="stock-btn" onclick="quickStart('KOTAKBANK')">KOTAKBANK</button>
+                <button class="stock-btn" onclick="quickStart('TCS')">TCS</button>
+                <button class="stock-btn" onclick="quickStart('RELIANCE')">RELIANCE</button>
+                <button class="stock-btn" onclick="quickStart('HDFCBANK')">HDFCBANK</button>
+                <button class="stock-btn" onclick="quickStart('INFY')">INFY</button>
+                <button class="stock-btn" onclick="quickStart('ITC')">ITC</button>
+                <button class="stock-btn" onclick="quickStart('SBIN')">SBIN</button>
+                <button class="stock-btn" onclick="quickStart('BAJFINANCE')">BAJFINANCE</button>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div class="card">
+                <h2>📊 Market Data <span id="statusIndicator" class="status-indicator status-stopped"></span></h2>
+                <div class="price-display">
+                    <div class="symbol" id="currentSymbol">Select a stock</div>
+                    <div class="current-price" id="currentPrice">₹0.00</div>
+                    <div id="lastUpdate">Last updated: Never</div>
+                </div>
+                
+                <div class="market-details">
+                    <div class="detail-item">
+                        <div class="detail-label">Volume</div>
+                        <div class="detail-value" id="volume">0</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">High</div>
+                        <div class="detail-value" id="high">₹0.00</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Low</div>
+                        <div class="detail-value" id="low">₹0.00</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Open</div>
+                        <div class="detail-value" id="open">₹0.00</div>
+                    </div>
+                </div>
+                
+                <div class="system-info">
+                    <div><strong>Sector:</strong> <span id="sector">N/A</span></div>
+                    <div><strong>Market Cap:</strong> <span id="marketCap">N/A</span></div>
+                    <div><strong>P/E Ratio:</strong> <span id="peRatio">N/A</span></div>
+                    <div><strong>System Status:</strong> <span id="systemStatus">IDLE</span></div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>🔮 AI Prediction</h2>
+                <div class="prediction-panel">
+                    <div id="predictionResult" class="prediction-result prediction-NEUTRAL">NEUTRAL</div>
+                    <div>Calibrated Confidence</div>
+                    <div class="confidence-bar">
+                        <div id="confidenceBar" class="confidence-fill" style="width: 35%"></div>
+                    </div>
+                    <div id="confidenceText">35.0%</div>
+                    <div style="margin-top: 15px;">
+                        <small>Raw Confidence: <span id="rawConfidence">35.0%</span></small>
+                    </div>
+                    
+                    <div class="system-info">
+                        <div><strong>RSI:</strong> <span id="rsi">50.0</span></div>
+                        <div><strong>Volume Ratio:</strong> <span id="volumeRatio">1.0</span></div>
+                        <div><strong>MA Signal:</strong> <span id="maSignal">NEUTRAL</span></div>
+                        <div><strong>Next Update:</strong> <span id="nextUpdate">12s</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="performance-section">
+            <h2>📈 Enhanced Performance Analytics</h2>
+            <div class="performance-grid">
+                <div class="perf-item">
+                    <div class="perf-number" id="totalPredictions">0</div>
+                    <div class="perf-label">Total Predictions</div>
+                </div>
+                <div class="perf-item">
+                    <div class="perf-number" id="overallAccuracy">0.0%</div>
+                    <div class="perf-label">Overall Accuracy</div>
+                </div>
+                <div class="perf-item">
+                    <div class="perf-number" id="rollingAccuracy">0.0%</div>
+                    <div class="perf-label">Rolling Accuracy (50)</div>
+                </div>
+                <div class="perf-item">
+                    <div class="perf-number" id="rollingPredictions">0</div>
+                    <div class="perf-label">Rolling Window</div>
+                </div>
+                <div class="perf-item">
+                    <div class="perf-number" id="correctPredictions">0</div>
+                    <div class="perf-label">Correct Predictions</div>
+                </div>
+                <div class="perf-item">
+                    <div class="perf-number" id="warmupStatus">WARMING</div>
+                    <div class="perf-label">System State</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="disclaimer">
+            <strong>⚠️ FINTECH DISCLAIMER:</strong><br>
+            This is an AI-powered prediction system for educational and research purposes only. 
+            <strong>NOT financial advice.</strong> Stock markets are inherently risky and volatile. 
+            The system requires warm-up period for optimal performance. 
+            Past performance does not guarantee future results. 
+            <strong>Invest responsibly and consult a certified financial advisor.</strong>
+        </div>
+        
+        <div class="card">
+            <h2>📋 System Logs</h2>
+            <div class="log-container" id="logContainer">
+                <div class="log-entry log-info">Fintech system ready. Select a stock to begin enhanced predictions.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let currentSymbol = null;
+        
+        function addLog(message, type = 'info') {
+            const container = document.getElementById('logContainer');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            container.appendChild(entry);
+            container.scrollTop = container.scrollHeight;
+            
+            // Keep only last 50 entries
+            const entries = container.children;
+            if (entries.length > 50) {
+                container.removeChild(entries[0]);
+            }
+        }
+        
+        socket.on('connect', function() {
+            addLog('🔌 Connected to Fintech Enhanced Dashboard', 'info');
+        });
+        
+        socket.on('market_update', function(data) {
+            addLog(`📊 Market update for ${data.symbol}: ₹${data.price.toFixed(2)} - ${data.prediction} (${(data.confidence * 100).toFixed(1)}%)`, 'info');
+            
+            // Update main display
+            document.getElementById('currentSymbol').textContent = data.symbol;
+            document.getElementById('currentPrice').textContent = `₹${data.price.toFixed(2)}`;
+            document.getElementById('lastUpdate').textContent = `Last updated: ${new Date(data.timestamp).toLocaleTimeString()}`;
+            
+            // Update market details
+            document.getElementById('volume').textContent = data.volume.toLocaleString();
+            document.getElementById('high').textContent = `₹${data.high.toFixed(2)}`;
+            document.getElementById('low').textContent = `₹${data.low.toFixed(2)}`;
+            document.getElementById('open').textContent = `₹${data.open.toFixed(2)}`;
+            
+            // Update company info
+            document.getElementById('sector').textContent = data.sector || 'N/A';
+            document.getElementById('marketCap').textContent = data.market_cap || 'N/A';
+            document.getElementById('peRatio').textContent = data.pe_ratio || 'N/A';
+            document.getElementById('systemStatus').textContent = data.system_status || 'ACTIVE';
+            
+            // Update prediction
+            const predResult = document.getElementById('predictionResult');
+            predResult.textContent = data.prediction;
+            predResult.className = `prediction-result prediction-${data.prediction}`;
+            
+            // Update confidence
+            const confidence = (data.confidence * 100).toFixed(1);
+            const rawConfidence = (data.raw_confidence * 100).toFixed(1);
+            document.getElementById('confidenceBar').style.width = `${confidence}%`;
+            document.getElementById('confidenceText').textContent = `${confidence}%`;
+            document.getElementById('rawConfidence').textContent = `${rawConfidence}%`;
+            
+            // Update technical indicators
+            if (data.features && !data.features.basic) {
+                document.getElementById('rsi').textContent = data.features.rsi.toFixed(1);
+                document.getElementById('volumeRatio').textContent = data.features.volume_ratio.toFixed(2);
+                
+                const priceMA = data.features.price_ma5_ratio;
+                const maSignal = priceMA > 1.02 ? 'BULLISH' : priceMA < 0.98 ? 'BEARISH' : 'NEUTRAL';
+                document.getElementById('maSignal').textContent = maSignal;
+            }
+            
+            // Update performance
+            if (data.performance) {
+                document.getElementById('totalPredictions').textContent = data.performance.total_predictions;
+                document.getElementById('overallAccuracy').textContent = `${(data.performance.accuracy * 100).toFixed(1)}%`;
+                document.getElementById('rollingAccuracy').textContent = `${(data.performance.rolling_accuracy * 100).toFixed(1)}%`;
+                document.getElementById('rollingPredictions').textContent = data.performance.rolling_predictions;
+                document.getElementById('correctPredictions').textContent = data.performance.correct_predictions;
+                document.getElementById('warmupStatus').textContent = data.performance.is_warming_up ? 'WARMING' : 'ACTIVE';
+            }
+            
+            // Update next prediction timer
+            if (data.next_prediction_in) {
+                document.getElementById('nextUpdate').textContent = `${data.next_prediction_in}s`;
+            }
+            
+            // Update status indicator
+            const indicator = document.getElementById('statusIndicator');
+            if (data.system_status === 'WARMING_UP') {
+                indicator.className = 'status-indicator status-warming';
+            } else {
+                indicator.className = 'status-indicator status-running';
+            }
+        });
+        
+        function startPrediction() {
+            const symbol = document.getElementById('stockSymbol').value.trim();
+            if (!symbol) {
+                addLog('❌ Please enter a stock symbol', 'error');
+                return;
+            }
+            
+            addLog(`🚀 Starting Fintech enhanced prediction for ${symbol}...`, 'info');
+            currentSymbol = symbol;
+            
+            fetch(`/api/start/${symbol}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        addLog(`✅ ${data.message}`, 'info');
+                        document.getElementById('statusIndicator').className = 'status-indicator status-running';
+                        updateActiveButton(symbol);
+                    } else {
+                        addLog(`❌ ${data.message}`, 'error');
+                    }
+                })
+                .catch(error => {
+                    addLog(`💥 Connection error: ${error.message}`, 'error');
+                });
+        }
+        
+        function stopPrediction() {
+            addLog('⏹️ Stopping Fintech prediction...', 'info');
+            
+            fetch('/api/stop')
+                .then(response => response.json())
+                .then(data => {
+                    addLog(`✅ ${data.message}`, 'info');
+                    document.getElementById('statusIndicator').className = 'status-indicator status-stopped';
+                    clearActiveButtons();
+                })
+                .catch(error => {
+                    addLog(`💥 Error stopping: ${error.message}`, 'error');
+                });
+        }
+        
+        function quickStart(symbol) {
+            document.getElementById('stockSymbol').value = symbol;
+            startPrediction();
+        }
+        
+        function updateActiveButton(symbol) {
+            clearActiveButtons();
+            const buttons = document.querySelectorAll('.stock-btn');
+            buttons.forEach(btn => {
+                if (btn.textContent === symbol) {
+                    btn.classList.add('active');
+                }
+            });
+        }
+        
+        function clearActiveButtons() {
+            document.querySelectorAll('.stock-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+        }
+        
+        // Enable Enter key for stock input
+        document.getElementById('stockSymbol').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                startPrediction();
+            }
+        });
+        
+        // Initial status check
+        fetch('/api/status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.is_running) {
+                    addLog(`🔄 Resuming Fintech session for ${data.display_symbol}`, 'info');
+                    document.getElementById('statusIndicator').className = 'status-indicator status-running';
+                    updateActiveButton(data.display_symbol);
+                }
+            })
+            .catch(error => {
+                addLog('ℹ️ No active Fintech session found', 'info');
+            });
+    </script>
+</body>
+</html>

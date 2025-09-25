@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fintech Stock Predictor - Simple</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        .controls {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+        }
+        .stock-selection {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+        .quick-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .stock-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 13px;
+        }
+        .stock-btn:hover, .stock-btn.active {
+            background: #4CAF50;
+            border-color: #4CAF50;
+            transform: translateY(-2px);
+        }
+        .data-panel {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+        }
+        .price {
+            font-size: 3.5rem;
+            font-weight: bold;
+            color: #00d4aa;
+            text-align: center;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .prediction {
+            font-size: 2.5rem;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            text-align: center;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+        .prediction.up { 
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white; 
+        }
+        .prediction.down { 
+            background: linear-gradient(45deg, #f44336, #d32f2f);
+            color: white; 
+        }
+        .prediction.neutral { 
+            background: linear-gradient(45deg, #FF9800, #F57C00);
+            color: white; 
+        }
+        button {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            font-size: 1.1rem;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 5px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+        button:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+        }
+        button.stop {
+            background: linear-gradient(45deg, #f44336, #d32f2f);
+            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3);
+        }
+        select {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 10px 15px;
+            font-size: 1rem;
+            border-radius: 20px;
+            min-width: 200px;
+        }
+        select option {
+            background: #333;
+            color: white;
+        }
+        .market-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .detail-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .detail-label {
+            font-size: 0.9em;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+        .detail-value {
+            font-size: 1.3em;
+            font-weight: bold;
+        }
+        .status {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 20px;
+            border-radius: 25px;
+            display: inline-block;
+            margin: 10px 0;
+        }
+        #logs {
+            background: rgba(0, 0, 0, 0.4);
+            color: #0f0;
+            padding: 15px;
+            border-radius: 10px;
+            height: 250px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .confidence-bar {
+            width: 100%;
+            height: 25px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #45a049);
+            transition: width 0.3s ease;
+            border-radius: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏦 Fintech Stock Predictor</h1>
+            <p>Simple & Reliable Indian Stock Market Predictions</p>
+        </div>
+        
+        <div class="controls">
+            <div class="stock-selection">
+                <select id="symbolSelect">
+                    <option value="">Choose stock...</option>
+                    <option value="KOTAKBANK.NS">KOTAKBANK.NS - Kotak Mahindra Bank</option>
+                    <option value="TCS.NS">TCS.NS - Tata Consultancy Services</option>
+                    <option value="RELIANCE.NS">RELIANCE.NS - Reliance Industries</option>
+                    <option value="HDFCBANK.NS">HDFCBANK.NS - HDFC Bank</option>
+                    <option value="INFY.NS">INFY.NS - Infosys</option>
+                    <option value="ITC.NS">ITC.NS - ITC Limited</option>
+                    <option value="SBIN.NS">SBIN.NS - State Bank of India</option>
+                    <option value="BAJFINANCE.NS">BAJFINANCE.NS - Bajaj Finance</option>
+                </select>
+                <button onclick="startPrediction()">🚀 Start</button>
+                <button class="stop" onclick="stopPrediction()">⏹️ Stop</button>
+            </div>
+            
+            <div class="quick-buttons">
+                <button class="stock-btn" onclick="quickSelect('KOTAKBANK.NS')">KOTAKBANK</button>
+                <button class="stock-btn" onclick="quickSelect('TCS.NS')">TCS</button>
+                <button class="stock-btn" onclick="quickSelect('RELIANCE.NS')">RELIANCE</button>
+                <button class="stock-btn" onclick="quickSelect('HDFCBANK.NS')">HDFCBANK</button>
+                <button class="stock-btn" onclick="quickSelect('INFY.NS')">INFY</button>
+                <button class="stock-btn" onclick="quickSelect('ITC.NS')">ITC</button>
+            </div>
+            
+            <div class="status" id="status">Ready to start</div>
+        </div>
+        
+        <div class="data-panel">
+            <h2 id="symbolName">Select a stock to begin</h2>
+            <div id="price" class="price">₹---.--</div>
+            <div id="prediction" class="prediction neutral">WAITING</div>
+            
+            <div>Confidence</div>
+            <div class="confidence-bar">
+                <div id="confidenceBar" class="confidence-fill" style="width: 0%"></div>
+            </div>
+            <div id="confidenceText">0.0%</div>
+            
+            <div class="market-details">
+                <div class="detail-item">
+                    <div class="detail-label">Volume</div>
+                    <div class="detail-value" id="volume">---</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">High</div>
+                    <div class="detail-value" id="high">₹---.--</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Low</div>
+                    <div class="detail-value" id="low">₹---.--</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Open</div>
+                    <div class="detail-value" id="open">₹---.--</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Iteration</div>
+                    <div class="detail-value" id="iteration">0</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Last Update</div>
+                    <div class="detail-value" id="timestamp">Never</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="data-panel">
+            <h3>📋 Live System Logs</h3>
+            <div id="logs">System ready. Select a stock to begin prediction...\n</div>
+        </div>
+    </div>
+
+    <script>
+        let socket = null;
+        let isRunning = false;
+        
+        function log(message) {
+            const logs = document.getElementById('logs');
+            const time = new Date().toLocaleTimeString();
+            logs.innerHTML += `[${time}] ${message}\n`;
+            logs.scrollTop = logs.scrollHeight;
+            
+            // Keep only last 100 lines
+            const lines = logs.innerHTML.split('\n');
+            if (lines.length > 100) {
+                logs.innerHTML = lines.slice(-100).join('\n');
+            }
+        }
+        
+        function updateActiveButton(symbol) {
+            // Clear all active states
+            document.querySelectorAll('.stock-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Set active button
+            document.querySelectorAll('.stock-btn').forEach(btn => {
+                if (btn.textContent === symbol.split('.')[0]) {
+                    btn.classList.add('active');
+                }
+            });
+        }
+        
+        function quickSelect(symbol) {
+            document.getElementById('symbolSelect').value = symbol;
+            updateActiveButton(symbol);
+            startPrediction();
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            socket = io();
+            
+            socket.on('connect', function() {
+                log('🔌 Connected to Fintech server');
+                document.getElementById('status').textContent = 'Connected - Ready';
+            });
+            
+            socket.on('disconnect', function() {
+                log('❌ Disconnected from server');
+                document.getElementById('status').textContent = 'Disconnected';
+            });
+            
+            socket.on('market_update', function(data) {
+                log(`📊 ${data.symbol}: ₹${data.price.toFixed(2)} -> ${data.prediction} (${(data.confidence * 100).toFixed(1)}%)`);
+                
+                // Update display
+                document.getElementById('symbolName').textContent = data.symbol;
+                document.getElementById('price').textContent = `₹${data.price.toFixed(2)}`;
+                
+                // Update prediction
+                const predictionElement = document.getElementById('prediction');
+                predictionElement.textContent = data.prediction;
+                predictionElement.className = `prediction ${data.prediction.toLowerCase()}`;
+                
+                // Update confidence
+                const confidence = (data.confidence * 100).toFixed(1);
+                document.getElementById('confidenceText').textContent = `${confidence}%`;
+                document.getElementById('confidenceBar').style.width = `${confidence}%`;
+                
+                // Update market details
+                document.getElementById('volume').textContent = data.volume.toLocaleString();
+                document.getElementById('high').textContent = `₹${data.high.toFixed(2)}`;
+                document.getElementById('low').textContent = `₹${data.low.toFixed(2)}`;
+                document.getElementById('open').textContent = `₹${data.open.toFixed(2)}`;
+                document.getElementById('iteration').textContent = data.iteration || 0;
+                document.getElementById('timestamp').textContent = 
+                    new Date(data.timestamp).toLocaleTimeString();
+                
+                // Update active button
+                updateActiveButton(data.yahoo_symbol);
+            });
+        });
+        
+        function startPrediction() {
+            const symbol = document.getElementById('symbolSelect').value;
+            if (!symbol) {
+                alert('Please select a stock first!');
+                return;
+            }
+            
+            log(`🚀 Starting Fintech prediction for ${symbol}`);
+            document.getElementById('status').textContent = 'Starting...';
+            
+            fetch(`/api/start/${symbol}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        isRunning = true;
+                        document.getElementById('status').textContent = 'Running - Live Predictions';
+                        log(`✅ ${data.message}`);
+                        updateActiveButton(symbol);
+                    } else {
+                        document.getElementById('status').textContent = 'Error';
+                        log(`❌ Error: ${data.message}`);
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('status').textContent = 'Connection Error';
+                    log(`💥 Connection error: ${error}`);
+                });
+        }
+        
+        function stopPrediction() {
+            log('⏹️ Stopping Fintech prediction');
+            document.getElementById('status').textContent = 'Stopping...';
+            
+            fetch('/api/stop')
+                .then(response => response.json())
+                .then(data => {
+                    isRunning = false;
+                    document.getElementById('status').textContent = 'Stopped';
+                    log(`✅ ${data.message}`);
+                    
+                    // Clear active buttons
+                    document.querySelectorAll('.stock-btn').forEach(btn => {
+                        btn.classList.remove('active');
+                    });
+                })
+                .catch(error => {
+                    document.getElementById('status').textContent = 'Error';
+                    log(`💥 Stop error: ${error}`);
+                });
+        }
+    </script>
+</body>
+</html>
