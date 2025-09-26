@@ -1223,6 +1223,26 @@
             }
         }
 
+        // Check system status via HTTP
+        function checkSystemStatus() {
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    updateStatus('websocket-status', data.websocket, data.websocket ? 'Connected' : 'Disconnected');
+                    updateStatus('analysis-status', data.analysis_engine, data.analysis_engine ? 'Active' : 'Offline');
+                    updateStatus('crypto-status', data.crypto_data, data.crypto_data ? 'Live' : 'Offline');
+                    updateStatus('chart-status', data.interactive_charts, data.interactive_charts ? 'Ready' : 'Offline');
+                })
+                .catch(error => {
+                    console.warn('Status check failed:', error);
+                    // Set all to offline if can't reach server
+                    updateStatus('websocket-status', false, 'Disconnected');
+                    updateStatus('analysis-status', false, 'Offline');
+                    updateStatus('crypto-status', false, 'Offline');
+                    updateStatus('chart-status', false, 'Offline');
+                });
+        }
+
         // Request market update
         function requestMarketUpdate() {
             socket.emit('request_market_update');
@@ -1230,10 +1250,14 @@
 
         // Initialize dashboard
         setTimeout(() => {
+            checkSystemStatus(); // Check status first
             requestMarketUpdate();
             updateCryptoData();
             updateMarketHeatmap();
         }, 2000);
+
+        // Check status every 30 seconds
+        setInterval(checkSystemStatus, 30000);
     </script>
 </body>
 </html>

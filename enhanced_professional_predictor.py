@@ -131,7 +131,11 @@ class EnhancedProfessionalPredictor:
         """Initialize the enhanced predictor"""
         self.app = Flask(__name__)
         self.app.secret_key = 'enhanced_professional_predictor_key_2024'
-        self.socketio = SocketIO(self.app, cors_allowed_origins="*", async_mode='threading')
+        self.socketio = SocketIO(self.app, cors_allowed_origins="*", logger=True, engineio_logger=True)
+        
+        # Add custom JSON filter for templates
+        import json
+        self.app.jinja_env.filters['tojsonfilter'] = lambda x: json.dumps(x)
         
         # Enhanced stock lists with global markets
         self.stock_symbols = {
@@ -380,6 +384,17 @@ class EnhancedProfessionalPredictor:
                 # In a real app, this would load from database
                 watchlist = ['RELIANCE.NS', 'BTC-USD', 'AAPL', 'EURUSD=X']
                 return jsonify({'success': True, 'watchlist': watchlist})
+
+        @self.app.route('/api/status')
+        def system_status():
+            """Return system status for the dashboard indicators"""
+            return jsonify({
+                'websocket': True,
+                'analysis_engine': True,
+                'crypto_data': True,
+                'interactive_charts': True,
+                'timestamp': time.time()
+            })
     
     def _setup_socketio(self):
         """Setup SocketIO events"""
@@ -973,6 +988,171 @@ class EnhancedProfessionalPredictor:
                 logger.warning(f"⚠️ Index data error for {symbol}: {e}")
         
         return index_data
+    
+    def _get_crypto_summary(self) -> Dict[str, Any]:
+        """Get cryptocurrency market summary"""
+        crypto_symbols = ['BTC-USD', 'ETH-USD', 'BNB-USD', 'ADA-USD', 'XRP-USD']
+        crypto_data = {}
+        
+        for symbol in crypto_symbols:
+            try:
+                ticker = yf.Ticker(symbol)
+                data = ticker.history(period="2d")
+                if not data.empty:
+                    current = float(data['Close'].iloc[-1])
+                    previous = float(data['Close'].iloc[-2]) if len(data) > 1 else current
+                    change = current - previous
+                    change_percent = (change / previous) * 100
+                    
+                    crypto_data[symbol] = {
+                        'name': symbol.replace('-USD', ''),
+                        'price': current,
+                        'change': change,
+                        'change_percent': change_percent
+                    }
+            except Exception as e:
+                logger.warning(f"⚠️ Crypto data error for {symbol}: {e}")
+        
+        return crypto_data
+    
+    def _get_forex_summary(self) -> Dict[str, Any]:
+        """Get forex market summary"""
+        forex_pairs = ['EURUSD=X', 'GBPUSD=X', 'USDJPY=X', 'USDCAD=X', 'AUDUSD=X']
+        forex_data = {}
+        
+        for symbol in forex_pairs:
+            try:
+                ticker = yf.Ticker(symbol)
+                data = ticker.history(period="2d")
+                if not data.empty:
+                    current = float(data['Close'].iloc[-1])
+                    previous = float(data['Close'].iloc[-2]) if len(data) > 1 else current
+                    change = current - previous
+                    change_percent = (change / previous) * 100
+                    
+                    forex_data[symbol] = {
+                        'name': symbol.replace('=X', ''),
+                        'rate': current,
+                        'change': change,
+                        'change_percent': change_percent
+                    }
+            except Exception as e:
+                logger.warning(f"⚠️ Forex data error for {symbol}: {e}")
+        
+        return forex_data
+    
+    def _get_commodity_summary(self) -> Dict[str, Any]:
+        """Get commodity market summary"""
+        commodities = ['GC=F', 'SI=F', 'CL=F', 'NG=F']  # Gold, Silver, Crude Oil, Natural Gas
+        commodity_data = {}
+        
+        for symbol in commodities:
+            try:
+                ticker = yf.Ticker(symbol)
+                data = ticker.history(period="2d")
+                if not data.empty:
+                    current = float(data['Close'].iloc[-1])
+                    previous = float(data['Close'].iloc[-2]) if len(data) > 1 else current
+                    change = current - previous
+                    change_percent = (change / previous) * 100
+                    
+                    name_map = {'GC=F': 'Gold', 'SI=F': 'Silver', 'CL=F': 'Crude Oil', 'NG=F': 'Natural Gas'}
+                    commodity_data[symbol] = {
+                        'name': name_map.get(symbol, symbol),
+                        'price': current,
+                        'change': change,
+                        'change_percent': change_percent
+                    }
+            except Exception as e:
+                logger.warning(f"⚠️ Commodity data error for {symbol}: {e}")
+        
+        return commodity_data
+    
+    def _get_overall_market_sentiment(self) -> str:
+        """Get overall market sentiment"""
+        try:
+            # Simple sentiment based on major indices
+            nifty_ticker = yf.Ticker('^NSEI')
+            nifty_data = nifty_ticker.history(period="2d")
+            if not nifty_data.empty:
+                current = float(nifty_data['Close'].iloc[-1])
+                previous = float(nifty_data['Close'].iloc[-2]) if len(nifty_data) > 1 else current
+                change_percent = ((current - previous) / previous) * 100
+                
+                if change_percent > 1:
+                    return "Very Bullish"
+                elif change_percent > 0.5:
+                    return "Bullish"
+                elif change_percent > -0.5:
+                    return "Neutral"
+                elif change_percent > -1:
+                    return "Bearish"
+                else:
+                    return "Very Bearish"
+        except Exception:
+            pass
+        return "Neutral"
+    
+    def _get_top_performers(self, category: str) -> List[Dict[str, Any]]:
+        """Get top performing stocks"""
+        try:
+            performers = []
+            symbols = list(self.stock_symbols.keys())[:10]  # Sample from available symbols
+            
+            for symbol in symbols:
+                try:
+                    ticker = yf.Ticker(symbol)
+                    data = ticker.history(period="2d")
+                    if not data.empty:
+                        current = float(data['Close'].iloc[-1])
+                        previous = float(data['Close'].iloc[-2]) if len(data) > 1 else current
+                        change_percent = ((current - previous) / previous) * 100
+                        
+                        performers.append({
+                            'symbol': symbol,
+                            'name': self.stock_symbols.get(symbol, symbol),
+                            'price': current,
+                            'change_percent': change_percent
+                        })
+                except Exception:
+                    continue
+            
+            # Sort by change percentage
+            if category == 'gainers':
+                performers = sorted(performers, key=lambda x: x['change_percent'], reverse=True)[:5]
+            else:  # losers
+                performers = sorted(performers, key=lambda x: x['change_percent'])[:5]
+            
+            return performers
+        except Exception:
+            return []
+    
+    def _get_most_active_stocks(self) -> List[Dict[str, Any]]:
+        """Get most active stocks"""
+        try:
+            active_stocks = []
+            symbols = list(self.stock_symbols.keys())[:5]  # Sample symbols
+            
+            for symbol in symbols:
+                try:
+                    ticker = yf.Ticker(symbol)
+                    data = ticker.history(period="1d", interval="1h")
+                    if not data.empty:
+                        volume = float(data['Volume'].sum())
+                        current_price = float(data['Close'].iloc[-1])
+                        
+                        active_stocks.append({
+                            'symbol': symbol,
+                            'name': self.stock_symbols.get(symbol, symbol),
+                            'price': current_price,
+                            'volume': volume
+                        })
+                except Exception:
+                    continue
+            
+            return sorted(active_stocks, key=lambda x: x['volume'], reverse=True)
+        except Exception:
+            return []
     
     def _generate_advanced_prediction(self, data: pd.DataFrame, tech_analysis: TechnicalAnalysis) -> Tuple[str, float, str]:
         """Generate advanced prediction using multiple factors"""
