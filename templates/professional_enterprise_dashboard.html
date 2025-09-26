@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Professional Enterprise Stock Prediction Platform</title>
+    
+    <!-- Professional Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Chart.js for Professional Charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    
+    <!-- Socket.IO -->
+        <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    
+    <style>
+        :root {
+            /* Professional Color Palette */
+            --primary-bg: #0a0e1a;
+            --secondary-bg: #1a1f2e;
+            --card-bg: #242b3d;
+            --accent-bg: #2d3548;
+            --border-color: #3a4553;
+            
+            --primary-text: #ffffff;
+            --secondary-text: #b8c5d1;
+            --muted-text: #6b7785;
+            
+            --success-color: #00d4aa;
+            --danger-color: #ff4757;
+            --warning-color: #ffa502;
+            --info-color: #3742fa;
+            
+            --bullish-color: #00d4aa;
+            --bearish-color: #ff4757;
+            --neutral-color: #ffa502;
+            
+            --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --gradient-success: linear-gradient(135deg, #00d4aa 0%, #01a3a4 100%);
+            --gradient-danger: linear-gradient(135deg, #ff4757 0%, #c44569 100%);
+            
+            --shadow-soft: 0 2px 10px rgba(0,0,0,0.1);
+            --shadow-medium: 0 4px 20px rgba(0,0,0,0.15);
+            --shadow-strong: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--primary-bg);
+            color: var(--primary-text);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Professional Header */
+        .header {
+            background: var(--secondary-bg);
+            padding: 1rem 2rem;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo i {
+            font-size: 1.8rem;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .logo h1 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .stock-selector {
+            position: relative;
+        }
+
+        .stock-dropdown {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--primary-text);
+            padding: 8px 16px;
+            font-size: 0.9rem;
+            min-width: 200px;
+            cursor: pointer;
+        }
+
+        .system-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: var(--success-color);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--success-color);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Main Dashboard Layout */
+        .dashboard {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 2rem;
+        }
+
+        .main-content {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .sidebar {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        /* Professional Cards */
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-soft);
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-medium);
+            transform: translateY(-2px);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--primary-text);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-title i {
+            color: var(--info-color);
+        }
+
+        /* Chart Styles */
+        .charts-container {
+            padding: 15px;
+        }
+
+        .chart-tabs {
+            display: flex;
+            margin-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .chart-tab {
+            padding: 10px 20px;
+            background: transparent;
+            border: none;
+            color: var(--muted-text);
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .chart-tab:hover {
+            color: var(--text-color);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .chart-tab.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 300px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .chart-wrapper canvas {
+            max-height: 100%;
+            width: 100% !important;
+        }
+
+        /* Stock Overview Card */
+        .stock-overview {
+            grid-column: 1 / -1;
+        }
+
+        .stock-info {
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .stock-details h2 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .stock-details .company-name {
+            color: var(--secondary-text);
+            font-size: 0.95rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .stock-details .sector-info {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .sector-badge {
+            background: var(--accent-bg);
+            color: var(--secondary-text);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+        }
+
+        .price-info {
+            text-align: center;
+        }
+
+        .current-price {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .price-change {
+            font-size: 1.1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .price-change.positive {
+            color: var(--success-color);
+        }
+
+        .price-change.negative {
+            color: var(--danger-color);
+        }
+
+        /* Prediction Card */
+        .prediction-display {
+            text-align: center;
+            padding: 2rem 0;
+        }
+
+        .prediction-direction {
+            font-size: 2rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .prediction-direction.bullish {
+            color: var(--bullish-color);
+        }
+
+        .prediction-direction.bearish {
+            color: var(--bearish-color);
+        }
+
+        .prediction-direction.neutral {
+            color: var(--neutral-color);
+        }
+
+        .confidence-meter {
+            margin: 1.5rem 0;
+        }
+
+        .confidence-bar {
+            width: 100%;
+            height: 8px;
+            background: var(--accent-bg);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 0.5rem;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background: var(--gradient-success);
+            border-radius: 4px;
+            transition: width 0.8s ease;
+        }
+
+        .confidence-text {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--secondary-text);
+        }
+
+        /* Price Targets */
+        .price-targets {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .target-item {
+            text-align: center;
+            padding: 1rem;
+            background: var(--accent-bg);
+            border-radius: 8px;
+        }
+
+        .target-label {
+            font-size: 0.8rem;
+            color: var(--muted-text);
+            margin-bottom: 0.5rem;
+        }
+
+        .target-price {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--primary-text);
+        }
+
+        /* Technical Indicators */
+        .indicators-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .indicator-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.8rem;
+            background: var(--accent-bg);
+            border-radius: 6px;
+        }
+
+        .indicator-label {
+            font-size: 0.9rem;
+            color: var(--secondary-text);
+        }
+
+        .indicator-value {
+            font-weight: 600;
+            color: var(--primary-text);
+        }
+
+        /* Risk Analysis */
+        .risk-overview {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 1.5rem;
+            align-items: center;
+        }
+
+        .risk-level {
+            padding: 0.8rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 700;
+            text-align: center;
+            letter-spacing: 1px;
+        }
+
+        .risk-level.low {
+            background: var(--gradient-success);
+        }
+
+        .risk-level.medium {
+            background: var(--gradient-primary);
+        }
+
+        .risk-level.high {
+            background: var(--gradient-danger);
+        }
+
+        .risk-metrics {
+            display: grid;
+            gap: 0.8rem;
+        }
+
+        .risk-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Performance Analytics */
+        .performance-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .performance-item {
+            text-align: center;
+            padding: 1rem;
+            background: var(--accent-bg);
+            border-radius: 8px;
+        }
+
+        .performance-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .performance-label {
+            font-size: 0.85rem;
+            color: var(--secondary-text);
+        }
+
+        /* Control Buttons */
+        .control-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 2rem;
+        }
+
+        .btn {
+            padding: 0.8rem 2rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--gradient-primary);
+            color: white;
+        }
+
+        .btn-success {
+            background: var(--gradient-success);
+            color: white;
+        }
+
+        .btn-danger {
+            background: var(--gradient-danger);
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-medium);
+        }
+
+        /* Quick Stock Buttons */
+        .quick-stocks {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.8rem;
+        }
+
+        .stock-btn {
+            padding: 0.8rem;
+            background: var(--accent-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--primary-text);
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .stock-btn:hover {
+            background: var(--info-color);
+            transform: scale(1.02);
+        }
+
+        .stock-btn.active {
+            background: var(--gradient-primary);
+            border-color: transparent;
+        }
+
+        /* Status and Logs */
+        .system-logs {
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            line-height: 1.4;
+        }
+
+        .log-entry {
+            padding: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--secondary-text);
+        }
+
+        .log-entry.info {
+            color: var(--info-color);
+        }
+
+        .log-entry.success {
+            color: var(--success-color);
+        }
+
+        .log-entry.warning {
+            color: var(--warning-color);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1024px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+                padding: 1rem;
+            }
+            
+            .stock-info {
+                grid-template-columns: 1fr;
+                text-align: center;
+                gap: 1rem;
+            }
+            
+            .price-targets {
+                grid-template-columns: 1fr;
+            }
+            
+            .indicators-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Loading Animation */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--accent-bg);
+            border-top: 3px solid var(--info-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Professional Animations */
+        .fade-in {
+            animation: fadeIn 0.6s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .slide-in {
+            animation: slideIn 0.8s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(-100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Professional Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <i class="fas fa-chart-line"></i>
+                <h1>Professional Enterprise Platform</h1>
+            </div>
+            <div class="header-controls">
+                <div class="stock-selector">
+                    <select id="stockSelector" class="stock-dropdown">
+                        {% for symbol, data in stocks.items() %}
+                        <option value="{{ symbol }}" {% if symbol == current_stock %}selected{% endif %}>
+                            {{ data.name }} ({{ symbol.replace('.NS', '') }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="system-status">
+                    <div class="status-dot"></div>
+                    <span id="systemStatus">OPERATIONAL</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Dashboard -->
+    <div class="dashboard">
+        <!-- Main Content Area -->
+        <div class="main-content">
+            <!-- Stock Overview -->
+            <div class="card stock-overview fade-in">
+                <div class="stock-info">
+                    <div class="stock-details">
+                        <h2 id="stockSymbol">{{ current_stock.replace('.NS', '') }}</h2>
+                        <div class="company-name" id="companyName">{{ stocks[current_stock].name }}</div>
+                        <div class="sector-info">
+                            <span class="sector-badge" id="stockSector">{{ stocks[current_stock].sector }}</span>
+                            <span class="sector-badge" id="marketCap">{{ stocks[current_stock].market_cap }} Cap</span>
+                        </div>
+                    </div>
+                    <div class="price-info">
+                        <div class="current-price" id="currentPrice">₹0.00</div>
+                        <div class="price-change" id="priceChange">
+                            <i class="fas fa-arrow-up"></i>
+                            <span>+0.00 (0.00%)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Prediction Analysis -->
+            <div class="card fade-in">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-brain"></i>
+                        AI Prediction Analysis
+                    </div>
+                </div>
+                <div class="prediction-display">
+                    <div class="prediction-direction bullish" id="predictionDirection">LOADING...</div>
+                    <div class="confidence-meter">
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" id="confidenceFill" style="width: 0%"></div>
+                        </div>
+                        <div class="confidence-text">
+                            Confidence: <span id="confidenceValue">0%</span>
+                        </div>
+                    </div>
+                    <div class="price-targets">
+                        <div class="target-item">
+                            <div class="target-label">1-Day Target</div>
+                            <div class="target-price" id="target1d">₹0.00</div>
+                        </div>
+                        <div class="target-item">
+                            <div class="target-label">1-Week Target</div>
+                            <div class="target-price" id="target1w">₹0.00</div>
+                        </div>
+                        <div class="target-item">
+                            <div class="target-label">1-Month Target</div>
+                            <div class="target-price" id="target1m">₹0.00</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Technical Analysis -->
+            <div class="card fade-in">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-chart-bar"></i>
+                        Technical Indicators
+                    </div>
+                </div>
+                <div class="indicators-grid" id="technicalIndicators">
+                    <!-- Indicators will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Professional Charts -->
+            <div class="card fade-in">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-chart-line"></i>
+                        Price Charts & Analysis
+                    </div>
+                </div>
+                <div class="charts-container">
+                    <div class="chart-tabs">
+                        <button class="chart-tab active" onclick="switchChart('price')">Price Chart</button>
+                        <button class="chart-tab" onclick="switchChart('volume')">Volume Chart</button>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="priceChart" width="400" height="200"></canvas>
+                        <canvas id="volumeChart" width="400" height="200" style="display: none;"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <!-- Quick Stock Selection -->
+            <div class="card fade-in">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-star"></i>
+                        Quick Selection
+                    </div>
+                </div>
+                <div class="quick-stocks" id="quickStocks">
+                    <!-- Quick stock buttons will be generated -->
+                </div>
+            </div>
+
+            <!-- Risk Analysis -->
+            <div class="card fade-in">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-shield-alt"></i>
+                        Risk Analysis
+                    </div>
+                </div>
+                <div class="risk-overview">
+                    <div class="risk-metrics">
+                        <div class="risk-item">
+                            <span>Risk Score:</span>
+                            <span id="riskScore">0.0</span>
+                        </div>
+                        <div class="risk-item">
+                            <span>VaR (95%):</span>
+                            <span id="var95">₹0.00</span>
+                        </div>
+                        <div class="risk-item">
+                            <span>Max Drawdown:</span>
+                            <span id="maxDrawdown">0.00%</span>
+                        </div>
+                        <div class="risk-item">
+                            <span>Sharpe Ratio:</span>
+                            <span id="sharpeRatio">0.00</span>
+                        </div>
+                    </div>
+                    <div class="risk-level low" id="riskLevel">LOW</div>
+                </div>
+            </div>
+
+            <!-- Performance Analytics -->
+            <div class="card fade-in">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-trophy"></i>
+                        Performance
+                    </div>
+                </div>
+                <div class="performance-grid">
+                    <div class="performance-item">
+                        <div class="performance-value" id="accuracy1d">0%</div>
+                        <div class="performance-label">1-Day Accuracy</div>
+                    </div>
+                    <div class="performance-item">
+                        <div class="performance-value" id="winRate">0%</div>
+                        <div class="performance-label">Win Rate</div>
+                    </div>
+                    <div class="performance-item">
+                        <div class="performance-value" id="totalPredictions">0</div>
+                        <div class="performance-label">Total Predictions</div>
+                    </div>
+                    <div class="performance-item">
+                        <div class="performance-value" id="avgReturn">0.0%</div>
+                        <div class="performance-label">Avg Return</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Status -->
+            <div class="card fade-in">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-server"></i>
+                        System Status
+                    </div>
+                </div>
+                <div class="system-logs" id="systemLogs">
+                    <div class="log-entry info">System initialized...</div>
+                    <div class="log-entry success">Professional platform ready</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Control Buttons -->
+    <div class="control-buttons">
+        <button class="btn btn-success" id="startBtn">
+            <i class="fas fa-play"></i>
+            Start Analysis
+        </button>
+        <button class="btn btn-danger" id="stopBtn" style="display: none;">
+            <i class="fas fa-stop"></i>
+            Stop Analysis
+        </button>
+        <button class="btn btn-primary" id="refreshBtn">
+            <i class="fas fa-refresh"></i>
+            Refresh Data
+        </button>
+    </div>
+
+    <script>
+        // Professional WebSocket Connection
+        const socket = io();
+        let isAnalyzing = false;
+        let currentStock = '{{ current_stock }}';
+
+        // DOM Elements
+        const elements = {
+            stockSymbol: document.getElementById('stockSymbol'),
+            companyName: document.getElementById('companyName'),
+            stockSector: document.getElementById('stockSector'),
+            marketCap: document.getElementById('marketCap'),
+            currentPrice: document.getElementById('currentPrice'),
+            priceChange: document.getElementById('priceChange'),
+            predictionDirection: document.getElementById('predictionDirection'),
+            confidenceFill: document.getElementById('confidenceFill'),
+            confidenceValue: document.getElementById('confidenceValue'),
+            target1d: document.getElementById('target1d'),
+            target1w: document.getElementById('target1w'),
+            target1m: document.getElementById('target1m'),
+            technicalIndicators: document.getElementById('technicalIndicators'),
+            riskScore: document.getElementById('riskScore'),
+            var95: document.getElementById('var95'),
+            maxDrawdown: document.getElementById('maxDrawdown'),
+            sharpeRatio: document.getElementById('sharpeRatio'),
+            riskLevel: document.getElementById('riskLevel'),
+            accuracy1d: document.getElementById('accuracy1d'),
+            winRate: document.getElementById('winRate'),
+            totalPredictions: document.getElementById('totalPredictions'),
+            avgReturn: document.getElementById('avgReturn'),
+            systemLogs: document.getElementById('systemLogs'),
+            systemStatus: document.getElementById('systemStatus'),
+            startBtn: document.getElementById('startBtn'),
+            stopBtn: document.getElementById('stopBtn'),
+            refreshBtn: document.getElementById('refreshBtn'),
+            stockSelector: document.getElementById('stockSelector'),
+            quickStocks: document.getElementById('quickStocks')
+        };
+
+        // Initialize Professional Dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeQuickStocks();
+            setupEventListeners();
+            addLog('Professional Enterprise Platform initialized', 'success');
+        });
+
+        // Generate Quick Stock Buttons
+        function initializeQuickStocks() {
+            const stocks = {{ stocks | tojson }};
+            const topStocks = [
+                'RELIANCE.NS', 'TCS.NS', 'HDFCBANK.NS', 
+                'KOTAKBANK.NS', 'INFY.NS', 'ITC.NS'
+            ];
+            
+            elements.quickStocks.innerHTML = '';
+            
+            topStocks.forEach(symbol => {
+                if (stocks[symbol]) {
+                    const btn = document.createElement('button');
+                    btn.className = `stock-btn ${symbol === currentStock ? 'active' : ''}`;
+                    btn.innerHTML = `
+                        <div style="font-weight: 600;">${symbol.replace('.NS', '')}</div>
+                        <div style="font-size: 0.7rem; color: var(--secondary-text);">${stocks[symbol].sector}</div>
+                    `;
+                    btn.onclick = () => changeStock(symbol);
+                    elements.quickStocks.appendChild(btn);
+                }
+            });
+        }
+
+        // Setup Event Listeners
+        function setupEventListeners() {
+            // Control buttons
+            elements.startBtn.addEventListener('click', startAnalysis);
+            elements.stopBtn.addEventListener('click', stopAnalysis);
+            elements.refreshBtn.addEventListener('click', requestUpdate);
+            
+            // Stock selector
+            elements.stockSelector.addEventListener('change', function() {
+                changeStock(this.value);
+            });
+        }
+
+        // Professional Socket Event Handlers
+        socket.on('connect', function() {
+            addLog('Connected to Professional Enterprise Platform', 'success');
+            elements.systemStatus.textContent = 'CONNECTED';
+        });
+
+        socket.on('disconnect', function() {
+            addLog('Disconnected from server', 'warning');
+            elements.systemStatus.textContent = 'DISCONNECTED';
+        });
+
+        socket.on('system_status', function(data) {
+            addLog(`System Status: ${data.status} - ${data.message}`, 'info');
+            updateSystemInfo(data);
+        });
+
+        socket.on('professional_market_update', function(data) {
+            console.log('Received professional_market_update:', data);
+            updateProfessionalDashboard(data);
+        });
+
+        // Update Professional Dashboard
+        function updateProfessionalDashboard(data) {
+            console.log('Updating dashboard with data:', data);
+            try {
+                // Market Data
+                const market = data.market_data;
+                console.log('Market data:', market);
+                elements.stockSymbol.textContent = market.symbol.replace('.NS', '');
+                elements.companyName.textContent = market.company_name;
+                elements.currentPrice.textContent = `₹${market.current_price.toFixed(2)}`;
+                
+                // Price Change
+                const change = market.price_change;
+                const changePercent = market.price_change_percent;
+                const isPositive = change >= 0;
+                
+                elements.priceChange.className = `price-change ${isPositive ? 'positive' : 'negative'}`;
+                elements.priceChange.innerHTML = `
+                    <i class="fas fa-arrow-${isPositive ? 'up' : 'down'}"></i>
+                    <span>${isPositive ? '+' : ''}${change.toFixed(2)} (${changePercent.toFixed(2)}%)</span>
+                `;
+
+                // Prediction
+                const prediction = data.prediction;
+                updatePredictionDisplay(prediction);
+
+                // Technical Indicators
+                updateTechnicalIndicators(data.technical_indicators);
+
+                // Risk Analysis
+                updateRiskAnalysis(data.risk_analysis);
+
+                // Performance Analytics
+                updatePerformanceMetrics(data.performance);
+
+                addLog(`Professional update: ${market.symbol} @ ₹${market.current_price.toFixed(2)} | ${prediction.direction} (${prediction.confidence.toFixed(1)}%)`, 'info');
+
+            } catch (error) {
+                console.error('Dashboard update error:', error);
+                addLog('Dashboard update error', 'warning');
+            }
+        }
+
+        // Update Prediction Display
+        function updatePredictionDisplay(prediction) {
+            const direction = prediction.direction.toLowerCase();
+            
+            elements.predictionDirection.textContent = prediction.direction;
+            elements.predictionDirection.className = `prediction-direction ${direction}`;
+            
+            elements.confidenceValue.textContent = `${prediction.confidence.toFixed(1)}%`;
+            elements.confidenceFill.style.width = `${prediction.confidence}%`;
+            
+            elements.target1d.textContent = `₹${prediction.target_price_1d.toFixed(2)}`;
+            elements.target1w.textContent = `₹${prediction.target_price_1w.toFixed(2)}`;
+            elements.target1m.textContent = `₹${prediction.target_price_1m.toFixed(2)}`;
+        }
+
+        // Update Technical Indicators
+        function updateTechnicalIndicators(technical) {
+            const indicators = [
+                { label: 'RSI (14)', value: technical.rsi_14?.toFixed(1) || '0.0', unit: '' },
+                { label: 'RSI (21)', value: technical.rsi_21?.toFixed(1) || '0.0', unit: '' },
+                { label: 'MACD', value: technical.macd?.toFixed(3) || '0.000', unit: '' },
+                { label: 'SMA (5)', value: technical.sma_5?.toFixed(2) || '0.00', unit: '₹' },
+                { label: 'SMA (20)', value: technical.sma_20?.toFixed(2) || '0.00', unit: '₹' },
+                { label: 'SMA (50)', value: technical.sma_50?.toFixed(2) || '0.00', unit: '₹' },
+                { label: 'BB Upper', value: technical.bollinger_upper?.toFixed(2) || '0.00', unit: '₹' },
+                { label: 'BB Lower', value: technical.bollinger_lower?.toFixed(2) || '0.00', unit: '₹' },
+                { label: 'ATR', value: technical.atr?.toFixed(2) || '0.00', unit: '₹' },
+                { label: 'Volatility (10d)', value: (technical.volatility_10d * 100)?.toFixed(1) || '0.0', unit: '%' },
+                { label: 'Volume Ratio', value: technical.volume_ratio?.toFixed(2) || '1.00', unit: 'x' }
+            ];
+
+            elements.technicalIndicators.innerHTML = '';
+            
+            indicators.slice(0, 8).forEach(indicator => {
+                const div = document.createElement('div');
+                div.className = 'indicator-item';
+                div.innerHTML = `
+                    <span class="indicator-label">${indicator.label}</span>
+                    <span class="indicator-value">${indicator.unit}${indicator.value}</span>
+                `;
+                elements.technicalIndicators.appendChild(div);
+            });
+        }
+
+        // Update Risk Analysis
+        function updateRiskAnalysis(risk) {
+            elements.riskScore.textContent = risk.risk_score?.toFixed(1) || '0.0';
+            elements.var95.textContent = `₹${Math.abs(risk.var_1d_95 || 0).toFixed(2)}`;
+            elements.maxDrawdown.textContent = `${(Math.abs(risk.max_drawdown || 0) * 100).toFixed(2)}%`;
+            elements.sharpeRatio.textContent = risk.sharpe_estimate?.toFixed(2) || '0.00';
+            
+            const riskLevel = risk.risk_level || 'LOW';
+            elements.riskLevel.textContent = riskLevel;
+            elements.riskLevel.className = `risk-level ${riskLevel.toLowerCase()}`;
+        }
+
+        // Update Performance Metrics
+        function updatePerformanceMetrics(performance) {
+            elements.accuracy1d.textContent = `${(performance.accuracy_1d * 100).toFixed(0)}%`;
+            elements.winRate.textContent = `${(performance.win_rate * 100).toFixed(0)}%`;
+            elements.totalPredictions.textContent = performance.total_predictions || 0;
+            elements.avgReturn.textContent = `${performance.avg_return?.toFixed(1) || 0.0}%`;
+        }
+
+        // Professional Controls
+        function startAnalysis() {
+            isAnalyzing = true;
+            elements.startBtn.style.display = 'none';
+            elements.stopBtn.style.display = 'inline-flex';
+            socket.emit('request_market_update', { symbol: currentStock });
+            addLog('Professional analysis started', 'success');
+        }
+
+        function stopAnalysis() {
+            isAnalyzing = false;
+            elements.startBtn.style.display = 'inline-flex';
+            elements.stopBtn.style.display = 'none';
+            addLog('Analysis stopped', 'info');
+        }
+
+        function requestUpdate() {
+            socket.emit('request_market_update', { symbol: currentStock });
+            addLog('Manual update requested', 'info');
+        }
+
+        // Change Stock
+        function changeStock(symbol) {
+            // Use WebSocket for immediate stock change
+            socket.emit('change_stock', { symbol: symbol });
+            
+            // Update UI immediately
+            currentStock = symbol;
+            elements.stockSelector.value = symbol;
+            
+            // Update quick stock buttons
+            document.querySelectorAll('.stock-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Find and activate the corresponding button
+            document.querySelectorAll('.stock-btn').forEach(btn => {
+                if (btn.textContent.includes(symbol.replace('.NS', ''))) {
+                    btn.classList.add('active');
+                }
+            });
+            
+            // Show loading state
+            addLog(`Switching to ${symbol}...`, 'info');
+            elements.systemStatus.textContent = 'UPDATING';
+        }
+
+        // Add socket event handlers for stock change responses
+        socket.on('stock_changed', function(data) {
+            addLog(data.message, 'success');
+            elements.systemStatus.textContent = 'CONNECTED';
+        });
+
+        socket.on('stock_change_error', function(data) {
+            addLog(`Error: ${data.message}`, 'error');
+            elements.systemStatus.textContent = 'ERROR';
+        });
+
+        // System Logging
+        function addLog(message, type = 'info') {
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${type}`;
+            logEntry.innerHTML = `<span style="color: var(--muted-text);">[${new Date().toLocaleTimeString()}]</span> ${message}`;
+            
+            elements.systemLogs.appendChild(logEntry);
+            elements.systemLogs.scrollTop = elements.systemLogs.scrollHeight;
+            
+            // Keep only last 50 log entries
+            while (elements.systemLogs.children.length > 50) {
+                elements.systemLogs.removeChild(elements.systemLogs.firstChild);
+            }
+        }
+
+        // Update System Info
+        function updateSystemInfo(data) {
+            if (data.features) {
+                addLog(`Features: ${data.features.join(', ')}`, 'info');
+            }
+            if (data.uptime) {
+                addLog(`System uptime: ${data.uptime}`, 'info');
+            }
+        }
+
+        // Professional Auto-refresh
+        setInterval(() => {
+            if (isAnalyzing) {
+                requestUpdate();
+            }
+        }, 30000); // Every 30 seconds
+
+        // Chart Management
+        let priceChart = null;
+        let volumeChart = null;
+
+        function initializeCharts() {
+            // Initialize price chart
+            const priceCtx = document.getElementById('priceChart').getContext('2d');
+            priceChart = new Chart(priceCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Price',
+                        data: [],
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#e5e7eb' }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#9ca3af' },
+                            grid: { color: 'rgba(156, 163, 175, 0.1)' }
+                        },
+                        y: {
+                            ticks: { color: '#9ca3af' },
+                            grid: { color: 'rgba(156, 163, 175, 0.1)' }
+                        }
+                    }
+                }
+            });
+
+            // Initialize volume chart
+            const volumeCtx = document.getElementById('volumeChart').getContext('2d');
+            volumeChart = new Chart(volumeCtx, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Volume',
+                        data: [],
+                        backgroundColor: '#10b981',
+                        borderColor: '#059669',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#e5e7eb' }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#9ca3af' },
+                            grid: { color: 'rgba(156, 163, 175, 0.1)' }
+                        },
+                        y: {
+                            ticks: { color: '#9ca3af' },
+                            grid: { color: 'rgba(156, 163, 175, 0.1)' }
+                        }
+                    }
+                }
+            });
+
+            // Load initial charts
+            loadCharts(currentStock);
+        }
+
+        function loadCharts(symbol) {
+            fetch(`/api/v1/chart_data/${symbol}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updateCharts(data);
+                        addLog(`Charts updated for ${data.company_name}`, 'success');
+                    } else {
+                        addLog(`Chart loading error: ${data.error}`, 'warning');
+                    }
+                })
+                .catch(error => {
+                    console.error('Chart loading error:', error);
+                    addLog('Chart loading failed', 'error');
+                });
+        }
+
+        function updateCharts(data) {
+            // Update price chart
+            priceChart.data.labels = data.dates;
+            priceChart.data.datasets[0].data = data.prices.close;
+            priceChart.data.datasets[0].label = `${data.symbol.replace('.NS', '')} Price`;
+            priceChart.update();
+
+            // Update volume chart
+            volumeChart.data.labels = data.dates;
+            volumeChart.data.datasets[0].data = data.prices.volume;
+            volumeChart.data.datasets[0].label = `${data.symbol.replace('.NS', '')} Volume`;
+            volumeChart.update();
+        }
+
+        function switchChart(type) {
+            // Update tab states
+            document.querySelectorAll('.chart-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Show/hide charts
+            if (type === 'price') {
+                document.getElementById('priceChart').style.display = 'block';
+                document.getElementById('volumeChart').style.display = 'none';
+            } else {
+                document.getElementById('priceChart').style.display = 'none';
+                document.getElementById('volumeChart').style.display = 'block';
+            }
+        }
+
+        // Enhanced stock change function with immediate chart updates
+        function changeStock(symbol) {
+            // Use WebSocket for immediate stock change
+            socket.emit('change_stock', { symbol: symbol });
+            
+            // Update UI immediately
+            currentStock = symbol;
+            elements.stockSelector.value = symbol;
+            
+            // Update quick stock buttons
+            document.querySelectorAll('.stock-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Find and activate the corresponding button
+            document.querySelectorAll('.stock-btn').forEach(btn => {
+                if (btn.textContent.includes(symbol.replace('.NS', ''))) {
+                    btn.classList.add('active');
+                }
+            });
+            
+            // Load charts immediately
+            loadCharts(symbol);
+            
+            // Show loading state
+            addLog(`Switching to ${symbol}...`, 'info');
+            elements.systemStatus.textContent = 'UPDATING';
+        }
+
+        // Update socket handlers for improved stock switching
+        socket.on('stock_changed', function(data) {
+            addLog(data.message, 'success');
+            elements.systemStatus.textContent = 'CONNECTED';
+        });
+
+        socket.on('stock_change_error', function(data) {
+            addLog(`Error: ${data.message}`, 'error');
+            elements.systemStatus.textContent = 'ERROR';
+        });
+
+        socket.on('stock_loading', function(data) {
+            addLog(data.message, 'info');
+            elements.systemStatus.textContent = 'UPDATING';
+        });
+
+        // Initialize everything on page load (enhanced)
+        document.addEventListener('DOMContentLoaded', function() {
+            setupEventListeners();
+            initializeQuickStocks();
+            initializeCharts();
+            addLog('Professional Enterprise Platform with Charts Initialized', 'success');
+        });
+    </script>
+</body>
+</html>

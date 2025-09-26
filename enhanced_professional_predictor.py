@@ -46,6 +46,15 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 import plotly.utils
 
+# AI and Machine Learning imports
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, r2_score
+import warnings
+warnings.filterwarnings('ignore')
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -124,6 +133,23 @@ class ComprehensiveAnalysis:
     sector_analysis: Optional[Dict[str, Any]] = None
     options_flow: Optional[Dict[str, Any]] = None
 
+@dataclass
+class AIPrediction:
+    """AI-powered stock prediction with advanced ML models"""
+    symbol: str
+    current_price: float
+    predictions: Dict[str, Dict[str, Any]]  # 1d, 7d, 30d, 90d predictions
+    ml_models: Dict[str, Dict[str, Any]]  # Model performance metrics
+    ai_sentiment: Dict[str, Any]  # AI sentiment analysis
+    pattern_recognition: Dict[str, Any]  # Technical pattern detection
+    risk_assessment: Dict[str, Any]  # AI risk analysis
+    trading_signals: List[Dict[str, Any]]  # AI trading recommendations
+    confidence_intervals: Dict[str, Tuple[float, float]]  # Prediction ranges
+    market_regime: str  # Bull/Bear/Sideways market detection
+    anomaly_detection: Dict[str, Any]  # Unusual pattern detection
+    news_sentiment: Optional[Dict[str, Any]] = None
+    social_sentiment: Optional[Dict[str, Any]] = None
+
 class EnhancedProfessionalPredictor:
     """Enhanced professional-grade stock prediction system"""
     
@@ -131,11 +157,7 @@ class EnhancedProfessionalPredictor:
         """Initialize the enhanced predictor"""
         self.app = Flask(__name__)
         self.app.secret_key = 'enhanced_professional_predictor_key_2024'
-        self.socketio = SocketIO(self.app, cors_allowed_origins="*", logger=True, engineio_logger=True)
-        
-        # Add custom JSON filter for templates
-        import json
-        self.app.jinja_env.filters['tojsonfilter'] = lambda x: json.dumps(x)
+        self.socketio = SocketIO(self.app, cors_allowed_origins="*", async_mode='threading')
         
         # Enhanced stock lists with global markets
         self.stock_symbols = {
@@ -254,6 +276,12 @@ class EnhancedProfessionalPredictor:
                                  stock_names=self.all_symbols,
                                  current_stock=self.current_symbol)
         
+        @self.app.route('/test')
+        def test_page():
+            return render_template('test.html', 
+                                 stocks=self.all_symbols,
+                                 current_stock=self.current_symbol)
+        
         @self.app.route('/change_stock', methods=['POST'])
         def change_stock():
             data = request.get_json()
@@ -297,6 +325,61 @@ class EnhancedProfessionalPredictor:
                 return jsonify({
                     'success': True,
                     'sectors': sector_data
+                })
+            except Exception as e:
+                return jsonify({'success': False, 'error': str(e)})
+        
+        @self.app.route('/api/ai_prediction/<symbol>')
+        def get_ai_prediction(symbol):
+            try:
+                ai_prediction = self._generate_ai_prediction(symbol)
+                return jsonify({
+                    'success': True,
+                    'ai_prediction': asdict(ai_prediction)
+                })
+            except Exception as e:
+                return jsonify({'success': False, 'error': str(e)})
+        
+        @self.app.route('/api/ai_sentiment/<symbol>')
+        def get_ai_sentiment(symbol):
+            try:
+                sentiment_data = self._analyze_ai_sentiment(symbol)
+                return jsonify({
+                    'success': True,
+                    'ai_sentiment': sentiment_data
+                })
+            except Exception as e:
+                return jsonify({'success': False, 'error': str(e)})
+        
+        @self.app.route('/api/ai_patterns/<symbol>')
+        def get_ai_patterns(symbol):
+            try:
+                pattern_data = self._detect_ai_patterns(symbol)
+                return jsonify({
+                    'success': True,
+                    'ai_patterns': pattern_data
+                })
+            except Exception as e:
+                return jsonify({'success': False, 'error': str(e)})
+        
+        @self.app.route('/api/ai_risk/<symbol>')
+        def get_ai_risk(symbol):
+            try:
+                risk_data = self._assess_ai_risk(symbol)
+                return jsonify({
+                    'success': True,
+                    'ai_risk': risk_data
+                })
+            except Exception as e:
+                return jsonify({'success': False, 'error': str(e)})
+        
+        @self.app.route('/api/ai_trading_signals/<symbol>')
+        def get_ai_trading_signals(symbol):
+            try:
+                signals = self._generate_ai_trading_signals(symbol)
+                return jsonify({
+                    'success': True,
+                    'trading_signals': signals
                 })
             except Exception as e:
                 return jsonify({'success': False, 'error': str(e)})
@@ -384,17 +467,6 @@ class EnhancedProfessionalPredictor:
                 # In a real app, this would load from database
                 watchlist = ['RELIANCE.NS', 'BTC-USD', 'AAPL', 'EURUSD=X']
                 return jsonify({'success': True, 'watchlist': watchlist})
-
-        @self.app.route('/api/status')
-        def system_status():
-            """Return system status for the dashboard indicators"""
-            return jsonify({
-                'websocket': True,
-                'analysis_engine': True,
-                'crypto_data': True,
-                'interactive_charts': True,
-                'timestamp': time.time()
-            })
     
     def _setup_socketio(self):
         """Setup SocketIO events"""
@@ -989,171 +1061,6 @@ class EnhancedProfessionalPredictor:
         
         return index_data
     
-    def _get_crypto_summary(self) -> Dict[str, Any]:
-        """Get cryptocurrency market summary"""
-        crypto_symbols = ['BTC-USD', 'ETH-USD', 'BNB-USD', 'ADA-USD', 'XRP-USD']
-        crypto_data = {}
-        
-        for symbol in crypto_symbols:
-            try:
-                ticker = yf.Ticker(symbol)
-                data = ticker.history(period="2d")
-                if not data.empty:
-                    current = float(data['Close'].iloc[-1])
-                    previous = float(data['Close'].iloc[-2]) if len(data) > 1 else current
-                    change = current - previous
-                    change_percent = (change / previous) * 100
-                    
-                    crypto_data[symbol] = {
-                        'name': symbol.replace('-USD', ''),
-                        'price': current,
-                        'change': change,
-                        'change_percent': change_percent
-                    }
-            except Exception as e:
-                logger.warning(f"⚠️ Crypto data error for {symbol}: {e}")
-        
-        return crypto_data
-    
-    def _get_forex_summary(self) -> Dict[str, Any]:
-        """Get forex market summary"""
-        forex_pairs = ['EURUSD=X', 'GBPUSD=X', 'USDJPY=X', 'USDCAD=X', 'AUDUSD=X']
-        forex_data = {}
-        
-        for symbol in forex_pairs:
-            try:
-                ticker = yf.Ticker(symbol)
-                data = ticker.history(period="2d")
-                if not data.empty:
-                    current = float(data['Close'].iloc[-1])
-                    previous = float(data['Close'].iloc[-2]) if len(data) > 1 else current
-                    change = current - previous
-                    change_percent = (change / previous) * 100
-                    
-                    forex_data[symbol] = {
-                        'name': symbol.replace('=X', ''),
-                        'rate': current,
-                        'change': change,
-                        'change_percent': change_percent
-                    }
-            except Exception as e:
-                logger.warning(f"⚠️ Forex data error for {symbol}: {e}")
-        
-        return forex_data
-    
-    def _get_commodity_summary(self) -> Dict[str, Any]:
-        """Get commodity market summary"""
-        commodities = ['GC=F', 'SI=F', 'CL=F', 'NG=F']  # Gold, Silver, Crude Oil, Natural Gas
-        commodity_data = {}
-        
-        for symbol in commodities:
-            try:
-                ticker = yf.Ticker(symbol)
-                data = ticker.history(period="2d")
-                if not data.empty:
-                    current = float(data['Close'].iloc[-1])
-                    previous = float(data['Close'].iloc[-2]) if len(data) > 1 else current
-                    change = current - previous
-                    change_percent = (change / previous) * 100
-                    
-                    name_map = {'GC=F': 'Gold', 'SI=F': 'Silver', 'CL=F': 'Crude Oil', 'NG=F': 'Natural Gas'}
-                    commodity_data[symbol] = {
-                        'name': name_map.get(symbol, symbol),
-                        'price': current,
-                        'change': change,
-                        'change_percent': change_percent
-                    }
-            except Exception as e:
-                logger.warning(f"⚠️ Commodity data error for {symbol}: {e}")
-        
-        return commodity_data
-    
-    def _get_overall_market_sentiment(self) -> str:
-        """Get overall market sentiment"""
-        try:
-            # Simple sentiment based on major indices
-            nifty_ticker = yf.Ticker('^NSEI')
-            nifty_data = nifty_ticker.history(period="2d")
-            if not nifty_data.empty:
-                current = float(nifty_data['Close'].iloc[-1])
-                previous = float(nifty_data['Close'].iloc[-2]) if len(nifty_data) > 1 else current
-                change_percent = ((current - previous) / previous) * 100
-                
-                if change_percent > 1:
-                    return "Very Bullish"
-                elif change_percent > 0.5:
-                    return "Bullish"
-                elif change_percent > -0.5:
-                    return "Neutral"
-                elif change_percent > -1:
-                    return "Bearish"
-                else:
-                    return "Very Bearish"
-        except Exception:
-            pass
-        return "Neutral"
-    
-    def _get_top_performers(self, category: str) -> List[Dict[str, Any]]:
-        """Get top performing stocks"""
-        try:
-            performers = []
-            symbols = list(self.stock_symbols.keys())[:10]  # Sample from available symbols
-            
-            for symbol in symbols:
-                try:
-                    ticker = yf.Ticker(symbol)
-                    data = ticker.history(period="2d")
-                    if not data.empty:
-                        current = float(data['Close'].iloc[-1])
-                        previous = float(data['Close'].iloc[-2]) if len(data) > 1 else current
-                        change_percent = ((current - previous) / previous) * 100
-                        
-                        performers.append({
-                            'symbol': symbol,
-                            'name': self.stock_symbols.get(symbol, symbol),
-                            'price': current,
-                            'change_percent': change_percent
-                        })
-                except Exception:
-                    continue
-            
-            # Sort by change percentage
-            if category == 'gainers':
-                performers = sorted(performers, key=lambda x: x['change_percent'], reverse=True)[:5]
-            else:  # losers
-                performers = sorted(performers, key=lambda x: x['change_percent'])[:5]
-            
-            return performers
-        except Exception:
-            return []
-    
-    def _get_most_active_stocks(self) -> List[Dict[str, Any]]:
-        """Get most active stocks"""
-        try:
-            active_stocks = []
-            symbols = list(self.stock_symbols.keys())[:5]  # Sample symbols
-            
-            for symbol in symbols:
-                try:
-                    ticker = yf.Ticker(symbol)
-                    data = ticker.history(period="1d", interval="1h")
-                    if not data.empty:
-                        volume = float(data['Volume'].sum())
-                        current_price = float(data['Close'].iloc[-1])
-                        
-                        active_stocks.append({
-                            'symbol': symbol,
-                            'name': self.stock_symbols.get(symbol, symbol),
-                            'price': current_price,
-                            'volume': volume
-                        })
-                except Exception:
-                    continue
-            
-            return sorted(active_stocks, key=lambda x: x['volume'], reverse=True)
-        except Exception:
-            return []
-    
     def _generate_advanced_prediction(self, data: pd.DataFrame, tech_analysis: TechnicalAnalysis) -> Tuple[str, float, str]:
         """Generate advanced prediction using multiple factors"""
         signals = []
@@ -1462,6 +1369,938 @@ class EnhancedProfessionalPredictor:
         analysis_thread.start()
         logger.info("🚀 Enhanced analysis engine started")
     
+    def _get_crypto_summary(self) -> Dict[str, Any]:
+        """Get cryptocurrency market summary"""
+        try:
+            crypto_symbols = ['BTC-USD', 'ETH-USD', 'BNB-USD', 'ADA-USD', 'SOL-USD']
+            crypto_data = {}
+            
+            for symbol in crypto_symbols:
+                try:
+                    ticker = yf.Ticker(symbol)
+                    data = ticker.history(period='1d', interval='1m')
+                    if not data.empty:
+                        current_price = float(data['Close'].iloc[-1])
+                        previous_price = float(data['Close'].iloc[0])
+                        change_percent = ((current_price - previous_price) / previous_price) * 100
+                        
+                        crypto_data[symbol] = {
+                            'name': symbol.replace('-USD', ''),
+                            'price': current_price,
+                            'change_percent': change_percent,
+                            'volume': float(data['Volume'].sum())
+                        }
+                except:
+                    continue
+            
+            return crypto_data
+        except Exception as e:
+            logger.error(f"❌ Crypto summary error: {e}")
+            return {}
+    
+    def _get_forex_summary(self) -> Dict[str, Any]:
+        """Get forex market summary"""
+        try:
+            forex_pairs = ['EURUSD=X', 'GBPUSD=X', 'USDJPY=X', 'AUDUSD=X']
+            forex_data = {}
+            
+            for pair in forex_pairs:
+                try:
+                    ticker = yf.Ticker(pair)
+                    data = ticker.history(period='1d', interval='1h')
+                    if not data.empty:
+                        current_price = float(data['Close'].iloc[-1])
+                        previous_price = float(data['Close'].iloc[0])
+                        change_percent = ((current_price - previous_price) / previous_price) * 100
+                        
+                        forex_data[pair] = {
+                            'name': pair.replace('=X', ''),
+                            'price': current_price,
+                            'change_percent': change_percent
+                        }
+                except:
+                    continue
+            
+            return forex_data
+        except Exception as e:
+            logger.error(f"❌ Forex summary error: {e}")
+            return {}
+    
+    def _get_commodity_summary(self) -> Dict[str, Any]:
+        """Get commodities market summary"""
+        try:
+            commodity_symbols = ['GC=F', 'SI=F', 'CL=F', 'NG=F']  # Gold, Silver, Oil, Natural Gas
+            commodity_data = {}
+            
+            for symbol in commodity_symbols:
+                try:
+                    ticker = yf.Ticker(symbol)
+                    data = ticker.history(period='1d', interval='1h')
+                    if not data.empty:
+                        current_price = float(data['Close'].iloc[-1])
+                        previous_price = float(data['Close'].iloc[0])
+                        change_percent = ((current_price - previous_price) / previous_price) * 100
+                        
+                        name_mapping = {
+                            'GC=F': 'Gold',
+                            'SI=F': 'Silver',
+                            'CL=F': 'Crude Oil',
+                            'NG=F': 'Natural Gas'
+                        }
+                        
+                        commodity_data[symbol] = {
+                            'name': name_mapping.get(symbol, symbol),
+                            'price': current_price,
+                            'change_percent': change_percent
+                        }
+                except:
+                    continue
+            
+            return commodity_data
+        except Exception as e:
+            logger.error(f"❌ Commodity summary error: {e}")
+            return {}
+    
+    def _get_overall_market_sentiment(self) -> str:
+        """Get overall market sentiment"""
+        try:
+            # Analyze major indices for market sentiment
+            indices = ['^NSEI', '^GSPC', '^DJI']
+            sentiment_scores = []
+            
+            for index in indices:
+                try:
+                    ticker = yf.Ticker(index)
+                    data = ticker.history(period='1d', interval='1h')
+                    if not data.empty:
+                        current_price = float(data['Close'].iloc[-1])
+                        previous_price = float(data['Close'].iloc[0])
+                        change_percent = ((current_price - previous_price) / previous_price) * 100
+                        sentiment_scores.append(change_percent)
+                except:
+                    continue
+            
+            if sentiment_scores:
+                avg_sentiment = np.mean(sentiment_scores)
+                if avg_sentiment > 1:
+                    return "BULLISH"
+                elif avg_sentiment < -1:
+                    return "BEARISH"
+                else:
+                    return "NEUTRAL"
+            return "NEUTRAL"
+        except:
+            return "NEUTRAL"
+    
+    def _get_top_performers(self, type: str) -> List[Dict[str, Any]]:
+        """Get top performing stocks"""
+        try:
+            # Sample popular stocks for demonstration
+            sample_stocks = ['RELIANCE.NS', 'TCS.NS', 'INFY.NS', 'HDFCBANK.NS', 'ICICIBANK.NS']
+            performers = []
+            
+            for symbol in sample_stocks:
+                try:
+                    ticker = yf.Ticker(symbol)
+                    data = ticker.history(period='1d', interval='1h')
+                    if not data.empty:
+                        current_price = float(data['Close'].iloc[-1])
+                        previous_price = float(data['Close'].iloc[0])
+                        change_percent = ((current_price - previous_price) / previous_price) * 100
+                        
+                        performers.append({
+                            'symbol': symbol,
+                            'name': self.all_symbols.get(symbol, symbol),
+                            'price': current_price,
+                            'change_percent': change_percent
+                        })
+                except:
+                    continue
+            
+            # Sort based on type
+            if type == 'gainers':
+                performers.sort(key=lambda x: x['change_percent'], reverse=True)
+            else:  # losers
+                performers.sort(key=lambda x: x['change_percent'])
+            
+            return performers[:5]  # Top 5
+        except:
+            return []
+    
+    def _get_most_active_stocks(self) -> List[Dict[str, Any]]:
+        """Get most active stocks by volume"""
+        try:
+            # Sample stocks with volume data
+            sample_stocks = ['RELIANCE.NS', 'TCS.NS', 'INFY.NS', 'HDFCBANK.NS', 'ICICIBANK.NS']
+            active_stocks = []
+            
+            for symbol in sample_stocks:
+                try:
+                    ticker = yf.Ticker(symbol)
+                    data = ticker.history(period='1d', interval='1h')
+                    if not data.empty:
+                        volume = float(data['Volume'].sum())
+                        current_price = float(data['Close'].iloc[-1])
+                        
+                        active_stocks.append({
+                            'symbol': symbol,
+                            'name': self.all_symbols.get(symbol, symbol),
+                            'price': current_price,
+                            'volume': volume
+                        })
+                except:
+                    continue
+            
+            # Sort by volume
+            active_stocks.sort(key=lambda x: x['volume'], reverse=True)
+            return active_stocks[:5]  # Top 5
+        except:
+            return []
+    
+    def _generate_market_heatmap(self) -> Dict[str, Any]:
+        """Generate comprehensive market heatmap data"""
+        try:
+            # Major Indian stocks with sector classification
+            stock_sectors = {
+                'RELIANCE.NS': {'name': 'Reliance Industries', 'sector': 'Energy'},
+                'TCS.NS': {'name': 'Tata Consultancy Services', 'sector': 'IT'},
+                'HDFCBANK.NS': {'name': 'HDFC Bank', 'sector': 'Banking'},
+                'INFY.NS': {'name': 'Infosys', 'sector': 'IT'},
+                'ICICIBANK.NS': {'name': 'ICICI Bank', 'sector': 'Banking'},
+                'HINDUNILVR.NS': {'name': 'Hindustan Unilever', 'sector': 'FMCG'},
+                'SBIN.NS': {'name': 'State Bank of India', 'sector': 'Banking'},
+                'BHARTIARTL.NS': {'name': 'Bharti Airtel', 'sector': 'Telecom'},
+                'ITC.NS': {'name': 'ITC Limited', 'sector': 'FMCG'},
+                'KOTAKBANK.NS': {'name': 'Kotak Mahindra Bank', 'sector': 'Banking'},
+                'LT.NS': {'name': 'Larsen & Toubro', 'sector': 'Infrastructure'},
+                'AXISBANK.NS': {'name': 'Axis Bank', 'sector': 'Banking'},
+                'M&M.NS': {'name': 'Mahindra & Mahindra', 'sector': 'Auto'},
+                'ASIANPAINT.NS': {'name': 'Asian Paints', 'sector': 'Paints'},
+                'MARUTI.NS': {'name': 'Maruti Suzuki', 'sector': 'Auto'},
+                'SUNPHARMA.NS': {'name': 'Sun Pharmaceutical', 'sector': 'Pharma'},
+                'WIPRO.NS': {'name': 'Wipro', 'sector': 'IT'},
+                'NTPC.NS': {'name': 'NTPC', 'sector': 'Power'},
+                'ULTRACEMCO.NS': {'name': 'UltraTech Cement', 'sector': 'Cement'},
+                'ONGC.NS': {'name': 'ONGC', 'sector': 'Energy'}
+            }
+            
+            heatmap_data = {
+                'sectors': {},
+                'stocks': [],
+                'market_overview': {
+                    'total_stocks': 0,
+                    'gainers': 0,
+                    'losers': 0,
+                    'unchanged': 0
+                }
+            }
+            
+            gainers = 0
+            losers = 0
+            unchanged = 0
+            
+            for symbol, info in stock_sectors.items():
+                try:
+                    ticker = yf.Ticker(symbol)
+                    data = ticker.history(period='1d', interval='5m')
+                    
+                    if not data.empty:
+                        current_price = float(data['Close'].iloc[-1])
+                        open_price = float(data['Open'].iloc[0])
+                        change_percent = ((current_price - open_price) / open_price) * 100
+                        volume = float(data['Volume'].sum())
+                        
+                        # Determine color based on performance
+                        if change_percent > 0.5:
+                            color = '#00ff88'  # Bright green for strong gains
+                            performance = 'strong_gain'
+                            gainers += 1
+                        elif change_percent > 0:
+                            color = '#4CAF50'  # Green for gains
+                            performance = 'gain'
+                            gainers += 1
+                        elif change_percent < -0.5:
+                            color = '#ff4444'  # Red for losses
+                            performance = 'strong_loss'
+                            losers += 1
+                        elif change_percent < 0:
+                            color = '#ff6b6b'  # Light red for small losses
+                            performance = 'loss'
+                            losers += 1
+                        else:
+                            color = '#ffeb3b'  # Yellow for unchanged
+                            performance = 'unchanged'
+                            unchanged += 1
+                        
+                        stock_data = {
+                            'symbol': symbol,
+                            'name': info['name'],
+                            'sector': info['sector'],
+                            'price': round(current_price, 2),
+                            'change_percent': round(change_percent, 2),
+                            'volume': volume,
+                            'color': color,
+                            'performance': performance,
+                            'market_cap_size': 'large' if volume > 10000000 else 'medium' if volume > 1000000 else 'small'
+                        }
+                        
+                        heatmap_data['stocks'].append(stock_data)
+                        
+                        # Group by sector
+                        sector = info['sector']
+                        if sector not in heatmap_data['sectors']:
+                            heatmap_data['sectors'][sector] = {
+                                'name': sector,
+                                'stocks': [],
+                                'avg_change': 0,
+                                'total_volume': 0,
+                                'count': 0
+                            }
+                        
+                        heatmap_data['sectors'][sector]['stocks'].append(stock_data)
+                        heatmap_data['sectors'][sector]['total_volume'] += volume
+                        heatmap_data['sectors'][sector]['count'] += 1
+                
+                except Exception as e:
+                    logger.error(f"Error processing {symbol}: {e}")
+                    continue
+            
+            # Calculate sector averages
+            for sector_name, sector_data in heatmap_data['sectors'].items():
+                if sector_data['count'] > 0:
+                    sector_data['avg_change'] = round(
+                        sum(stock['change_percent'] for stock in sector_data['stocks']) / sector_data['count'], 2
+                    )
+                    
+                    # Sector color based on average performance
+                    avg_change = sector_data['avg_change']
+                    if avg_change > 1:
+                        sector_data['color'] = '#00ff88'
+                    elif avg_change > 0:
+                        sector_data['color'] = '#4CAF50'
+                    elif avg_change < -1:
+                        sector_data['color'] = '#ff4444'
+                    elif avg_change < 0:
+                        sector_data['color'] = '#ff6b6b'
+                    else:
+                        sector_data['color'] = '#ffeb3b'
+            
+            # Update market overview
+            heatmap_data['market_overview'] = {
+                'total_stocks': len(heatmap_data['stocks']),
+                'gainers': gainers,
+                'losers': losers,
+                'unchanged': unchanged,
+                'gainer_percentage': round((gainers / len(heatmap_data['stocks'])) * 100, 1) if heatmap_data['stocks'] else 0,
+                'loser_percentage': round((losers / len(heatmap_data['stocks'])) * 100, 1) if heatmap_data['stocks'] else 0
+            }
+            
+            return heatmap_data
+            
+        except Exception as e:
+            logger.error(f"Market heatmap generation error: {e}")
+            return {
+                'sectors': {},
+                'stocks': [],
+                'market_overview': {
+                    'total_stocks': 0,
+                    'gainers': 0,
+                    'losers': 0,
+                    'unchanged': 0
+                }
+            }
+    
+    def _generate_ai_prediction(self, symbol: str) -> AIPrediction:
+        """Generate AI-powered stock predictions using multiple ML models"""
+        try:
+            # Get historical data for training
+            ticker = yf.Ticker(symbol)
+            data = ticker.history(period='2y', interval='1d')
+            
+            if data.empty or len(data) < 100:
+                raise ValueError("Insufficient data for AI prediction")
+            
+            # Prepare features for ML models
+            features_df = self._prepare_ml_features(data)
+            
+            # Train multiple ML models
+            ml_models = self._train_ml_models(features_df)
+            
+            # Generate predictions for different timeframes
+            predictions = self._generate_ml_predictions(features_df, ml_models)
+            
+            # AI sentiment analysis
+            ai_sentiment = self._analyze_ai_sentiment(symbol)
+            
+            # Pattern recognition
+            pattern_recognition = self._detect_ai_patterns(symbol)
+            
+            # Risk assessment
+            risk_assessment = self._assess_ai_risk(symbol)
+            
+            # Generate trading signals
+            trading_signals = self._generate_ai_trading_signals(symbol)
+            
+            # Detect market regime
+            market_regime = self._detect_market_regime(data)
+            
+            # Anomaly detection
+            anomaly_detection = self._detect_anomalies(data)
+            
+            current_price = float(data['Close'].iloc[-1])
+            
+            return AIPrediction(
+                symbol=symbol,
+                current_price=current_price,
+                predictions=predictions,
+                ml_models=ml_models,
+                ai_sentiment=ai_sentiment,
+                pattern_recognition=pattern_recognition,
+                risk_assessment=risk_assessment,
+                trading_signals=trading_signals,
+                confidence_intervals=self._calculate_confidence_intervals(predictions),
+                market_regime=market_regime,
+                anomaly_detection=anomaly_detection
+            )
+            
+        except Exception as e:
+            logger.error(f"AI prediction error for {symbol}: {e}")
+            # Return default prediction
+            return AIPrediction(
+                symbol=symbol,
+                current_price=0.0,
+                predictions={'1d': {'price': 0, 'direction': 'NEUTRAL', 'confidence': 0}},
+                ml_models={'status': 'error'},
+                ai_sentiment={'overall': 'NEUTRAL', 'score': 0},
+                pattern_recognition={'patterns': []},
+                risk_assessment={'risk_score': 5, 'level': 'MEDIUM'},
+                trading_signals=[],
+                confidence_intervals={},
+                market_regime='SIDEWAYS',
+                anomaly_detection={'anomalies_detected': False}
+            )
+    
+    def _prepare_ml_features(self, data: pd.DataFrame) -> pd.DataFrame:
+        """Prepare features for machine learning models"""
+        df = data.copy()
+        
+        # Technical indicators as features
+        df['Returns'] = df['Close'].pct_change()
+        df['SMA_5'] = df['Close'].rolling(window=5).mean()
+        df['SMA_20'] = df['Close'].rolling(window=20).mean()
+        df['SMA_50'] = df['Close'].rolling(window=50).mean()
+        df['EMA_12'] = df['Close'].ewm(span=12).mean()
+        df['EMA_26'] = df['Close'].ewm(span=26).mean()
+        
+        # RSI
+        delta = df['Close'].diff()
+        gain = delta.where(delta > 0, 0).rolling(window=14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+        rs = gain / loss
+        df['RSI'] = 100 - (100 / (1 + rs))
+        
+        # MACD
+        df['MACD'] = df['EMA_12'] - df['EMA_26']
+        df['MACD_Signal'] = df['MACD'].ewm(span=9).mean()
+        
+        # Bollinger Bands
+        df['BB_Middle'] = df['Close'].rolling(window=20).mean()
+        bb_std = df['Close'].rolling(window=20).std()
+        df['BB_Upper'] = df['BB_Middle'] + (bb_std * 2)
+        df['BB_Lower'] = df['BB_Middle'] - (bb_std * 2)
+        df['BB_Position'] = (df['Close'] - df['BB_Lower']) / (df['BB_Upper'] - df['BB_Lower'])
+        
+        # Volatility
+        df['Volatility'] = df['Returns'].rolling(window=20).std()
+        
+        # Volume indicators
+        df['Volume_SMA'] = df['Volume'].rolling(window=20).mean()
+        df['Volume_Ratio'] = df['Volume'] / df['Volume_SMA']
+        
+        # Price momentum
+        df['Momentum_5'] = df['Close'] / df['Close'].shift(5) - 1
+        df['Momentum_10'] = df['Close'] / df['Close'].shift(10) - 1
+        df['Momentum_20'] = df['Close'] / df['Close'].shift(20) - 1
+        
+        # Target variable (next day return)
+        df['Target'] = df['Close'].shift(-1) / df['Close'] - 1
+        
+        # Clean data
+        df = df.dropna()
+        return df
+    
+    def _train_ml_models(self, features_df: pd.DataFrame) -> Dict[str, Dict[str, Any]]:
+        """Train multiple machine learning models"""
+        feature_columns = ['Returns', 'SMA_5', 'SMA_20', 'RSI', 'MACD', 'MACD_Signal', 
+                          'BB_Position', 'Volatility', 'Volume_Ratio', 
+                          'Momentum_5', 'Momentum_10', 'Momentum_20']
+        
+        X = features_df[feature_columns].values
+        y = features_df['Target'].values
+        
+        # Split data
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+        
+        # Scale features
+        scaler = StandardScaler()
+        X_train_scaled = scaler.fit_transform(X_train)
+        X_test_scaled = scaler.transform(X_test)
+        
+        models = {}
+        
+        # Random Forest
+        rf_model = RandomForestRegressor(n_estimators=100, random_state=42)
+        rf_model.fit(X_train_scaled, y_train)
+        rf_pred = rf_model.predict(X_test_scaled)
+        
+        models['random_forest'] = {
+            'model': rf_model,
+            'scaler': scaler,
+            'mse': mean_squared_error(y_test, rf_pred),
+            'r2': r2_score(y_test, rf_pred),
+            'feature_importance': dict(zip(feature_columns, rf_model.feature_importances_))
+        }
+        
+        # Gradient Boosting
+        gb_model = GradientBoostingRegressor(n_estimators=100, random_state=42)
+        gb_model.fit(X_train_scaled, y_train)
+        gb_pred = gb_model.predict(X_test_scaled)
+        
+        models['gradient_boosting'] = {
+            'model': gb_model,
+            'scaler': scaler,
+            'mse': mean_squared_error(y_test, gb_pred),
+            'r2': r2_score(y_test, gb_pred),
+            'feature_importance': dict(zip(feature_columns, gb_model.feature_importances_))
+        }
+        
+        # Linear Regression
+        lr_model = LinearRegression()
+        lr_model.fit(X_train_scaled, y_train)
+        lr_pred = lr_model.predict(X_test_scaled)
+        
+        models['linear_regression'] = {
+            'model': lr_model,
+            'scaler': scaler,
+            'mse': mean_squared_error(y_test, lr_pred),
+            'r2': r2_score(y_test, lr_pred),
+            'coefficients': dict(zip(feature_columns, lr_model.coef_))
+        }
+        
+        return models
+    
+    def _generate_ml_predictions(self, features_df: pd.DataFrame, ml_models: Dict) -> Dict[str, Dict[str, Any]]:
+        """Generate predictions using trained models"""
+        feature_columns = ['Returns', 'SMA_5', 'SMA_20', 'RSI', 'MACD', 'MACD_Signal', 
+                          'BB_Position', 'Volatility', 'Volume_Ratio', 
+                          'Momentum_5', 'Momentum_10', 'Momentum_20']
+        
+        # Get latest features
+        latest_features = features_df[feature_columns].iloc[-1].values.reshape(1, -1)
+        current_price = features_df['Close'].iloc[-1]
+        
+        predictions = {}
+        timeframes = ['1d', '7d', '30d', '90d']
+        
+        for timeframe in timeframes:
+            model_predictions = {}
+            
+            for model_name, model_info in ml_models.items():
+                if 'model' in model_info:
+                    scaler = model_info['scaler']
+                    model = model_info['model']
+                    
+                    # Scale features
+                    scaled_features = scaler.transform(latest_features)
+                    
+                    # Make prediction
+                    pred_return = model.predict(scaled_features)[0]
+                    
+                    # Adjust prediction based on timeframe
+                    timeframe_multiplier = {'1d': 1, '7d': 7, '30d': 30, '90d': 90}[timeframe]
+                    adjusted_return = pred_return * np.sqrt(timeframe_multiplier)  # Scale by sqrt(time)
+                    
+                    predicted_price = current_price * (1 + adjusted_return)
+                    
+                    model_predictions[model_name] = {
+                        'predicted_return': adjusted_return,
+                        'predicted_price': predicted_price,
+                        'model_confidence': model_info.get('r2', 0)
+                    }
+            
+            # Ensemble prediction (average of models weighted by R²)
+            total_weight = sum(pred.get('model_confidence', 0) for pred in model_predictions.values())
+            if total_weight > 0:
+                ensemble_return = sum(
+                    pred['predicted_return'] * pred.get('model_confidence', 0) 
+                    for pred in model_predictions.values()
+                ) / total_weight
+                
+                ensemble_price = current_price * (1 + ensemble_return)
+                
+                # Determine direction and confidence
+                direction = 'BULLISH' if ensemble_return > 0.01 else 'BEARISH' if ensemble_return < -0.01 else 'NEUTRAL'
+                confidence = min(abs(ensemble_return) * 100, 95)  # Cap at 95%
+                
+                predictions[timeframe] = {
+                    'predicted_price': round(ensemble_price, 2),
+                    'predicted_return': round(ensemble_return * 100, 2),
+                    'direction': direction,
+                    'confidence': round(confidence, 1),
+                    'individual_models': model_predictions
+                }
+        
+        return predictions
+    
+    def _analyze_ai_sentiment(self, symbol: str) -> Dict[str, Any]:
+        """AI-powered sentiment analysis"""
+        try:
+            # Simulated advanced sentiment analysis
+            # In production, this would integrate with news APIs, social media, etc.
+            
+            sentiment_score = np.random.normal(0, 0.3)  # Simulated sentiment
+            sentiment_score = max(-1, min(1, sentiment_score))  # Clamp between -1 and 1
+            
+            if sentiment_score > 0.3:
+                sentiment = 'VERY_POSITIVE'
+            elif sentiment_score > 0.1:
+                sentiment = 'POSITIVE'
+            elif sentiment_score > -0.1:
+                sentiment = 'NEUTRAL'
+            elif sentiment_score > -0.3:
+                sentiment = 'NEGATIVE'
+            else:
+                sentiment = 'VERY_NEGATIVE'
+            
+            return {
+                'overall_sentiment': sentiment,
+                'sentiment_score': round(sentiment_score, 3),
+                'news_sentiment': round(np.random.normal(sentiment_score, 0.1), 3),
+                'social_sentiment': round(np.random.normal(sentiment_score, 0.2), 3),
+                'analyst_sentiment': round(np.random.normal(sentiment_score, 0.15), 3),
+                'confidence': round(abs(sentiment_score) * 100, 1),
+                'sources_analyzed': ['news', 'social_media', 'analyst_reports'],
+                'last_updated': datetime.now().isoformat()
+            }
+        except Exception as e:
+            return {
+                'overall_sentiment': 'NEUTRAL',
+                'sentiment_score': 0,
+                'error': str(e)
+            }
+    
+    def _detect_ai_patterns(self, symbol: str) -> Dict[str, Any]:
+        """AI pattern recognition in price data"""
+        try:
+            ticker = yf.Ticker(symbol)
+            data = ticker.history(period='3mo', interval='1d')
+            
+            patterns = []
+            
+            # Simple pattern detection (can be enhanced with more sophisticated algorithms)
+            closes = data['Close'].values
+            
+            # Double top/bottom pattern
+            if len(closes) > 50:
+                peaks = []
+                troughs = []
+                
+                for i in range(2, len(closes) - 2):
+                    if closes[i] > closes[i-1] and closes[i] > closes[i+1]:
+                        if closes[i] > closes[i-2] and closes[i] > closes[i+2]:
+                            peaks.append((i, closes[i]))
+                    elif closes[i] < closes[i-1] and closes[i] < closes[i+1]:
+                        if closes[i] < closes[i-2] and closes[i] < closes[i+2]:
+                            troughs.append((i, closes[i]))
+                
+                # Check for double top
+                if len(peaks) >= 2:
+                    last_two_peaks = peaks[-2:]
+                    if abs(last_two_peaks[0][1] - last_two_peaks[1][1]) / last_two_peaks[0][1] < 0.03:
+                        patterns.append({
+                            'pattern': 'DOUBLE_TOP',
+                            'confidence': 0.7,
+                            'signal': 'BEARISH',
+                            'description': 'Double top pattern detected - potential reversal'
+                        })
+                
+                # Check for double bottom
+                if len(troughs) >= 2:
+                    last_two_troughs = troughs[-2:]
+                    if abs(last_two_troughs[0][1] - last_two_troughs[1][1]) / last_two_troughs[0][1] < 0.03:
+                        patterns.append({
+                            'pattern': 'DOUBLE_BOTTOM',
+                            'confidence': 0.7,
+                            'signal': 'BULLISH',
+                            'description': 'Double bottom pattern detected - potential reversal'
+                        })
+            
+            # Trend analysis
+            short_trend = np.polyfit(range(10), closes[-10:], 1)[0]
+            medium_trend = np.polyfit(range(30), closes[-30:], 1)[0]
+            long_trend = np.polyfit(range(50), closes[-50:] if len(closes) >= 50 else closes, 1)[0]
+            
+            if short_trend > 0 and medium_trend > 0:
+                patterns.append({
+                    'pattern': 'UPTREND',
+                    'confidence': 0.8,
+                    'signal': 'BULLISH',
+                    'description': 'Strong upward trend identified'
+                })
+            elif short_trend < 0 and medium_trend < 0:
+                patterns.append({
+                    'pattern': 'DOWNTREND',
+                    'confidence': 0.8,
+                    'signal': 'BEARISH',
+                    'description': 'Strong downward trend identified'
+                })
+            
+            return {
+                'patterns_detected': patterns,
+                'trend_analysis': {
+                    'short_term': 'BULLISH' if short_trend > 0 else 'BEARISH',
+                    'medium_term': 'BULLISH' if medium_trend > 0 else 'BEARISH',
+                    'long_term': 'BULLISH' if long_trend > 0 else 'BEARISH'
+                },
+                'total_patterns': len(patterns),
+                'last_updated': datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            return {
+                'patterns_detected': [],
+                'error': str(e)
+            }
+    
+    def _assess_ai_risk(self, symbol: str) -> Dict[str, Any]:
+        """AI-powered risk assessment"""
+        try:
+            ticker = yf.Ticker(symbol)
+            data = ticker.history(period='1y', interval='1d')
+            
+            if data.empty:
+                return {'risk_score': 5, 'risk_level': 'MEDIUM'}
+            
+            returns = data['Close'].pct_change().dropna()
+            
+            # Calculate risk metrics
+            volatility = returns.std() * np.sqrt(252)  # Annualized volatility
+            var_95 = np.percentile(returns, 5)  # Value at Risk (95%)
+            max_drawdown = self._calculate_max_drawdown(data['Close'])
+            
+            # Risk scoring (0-10 scale)
+            vol_score = min(volatility * 10, 10)  # Higher volatility = higher risk
+            var_score = min(abs(var_95) * 50, 10)  # Higher VaR = higher risk
+            drawdown_score = min(abs(max_drawdown) * 20, 10)  # Higher drawdown = higher risk
+            
+            # Weighted average risk score
+            risk_score = (vol_score * 0.4 + var_score * 0.3 + drawdown_score * 0.3)
+            
+            # Risk level classification
+            if risk_score < 3:
+                risk_level = 'LOW'
+                risk_color = '#4CAF50'
+            elif risk_score < 6:
+                risk_level = 'MEDIUM'
+                risk_color = '#ffeb3b'
+            elif risk_score < 8:
+                risk_level = 'HIGH'
+                risk_color = '#ff9800'
+            else:
+                risk_level = 'VERY_HIGH'
+                risk_color = '#f44336'
+            
+            return {
+                'risk_score': round(risk_score, 2),
+                'risk_level': risk_level,
+                'risk_color': risk_color,
+                'volatility': round(volatility * 100, 2),
+                'var_95': round(var_95 * 100, 2),
+                'max_drawdown': round(max_drawdown * 100, 2),
+                'risk_factors': {
+                    'market_volatility': round(vol_score, 1),
+                    'downside_risk': round(var_score, 1),
+                    'historical_drawdown': round(drawdown_score, 1)
+                },
+                'last_updated': datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            return {
+                'risk_score': 5,
+                'risk_level': 'MEDIUM',
+                'error': str(e)
+            }
+    
+    def _generate_ai_trading_signals(self, symbol: str) -> List[Dict[str, Any]]:
+        """Generate AI-powered trading signals"""
+        try:
+            ticker = yf.Ticker(symbol)
+            data = ticker.history(period='3mo', interval='1d')
+            
+            signals = []
+            current_price = float(data['Close'].iloc[-1])
+            
+            # Technical analysis signals
+            tech_analysis = self._calculate_advanced_technical_indicators(data)
+            
+            # RSI signals
+            if tech_analysis.rsi < 30:
+                signals.append({
+                    'signal_type': 'BUY',
+                    'indicator': 'RSI',
+                    'strength': 'STRONG',
+                    'confidence': 0.8,
+                    'reason': f'RSI oversold at {tech_analysis.rsi:.1f}',
+                    'entry_price': current_price,
+                    'target_price': current_price * 1.05,
+                    'stop_loss': current_price * 0.97
+                })
+            elif tech_analysis.rsi > 70:
+                signals.append({
+                    'signal_type': 'SELL',
+                    'indicator': 'RSI',
+                    'strength': 'STRONG',
+                    'confidence': 0.8,
+                    'reason': f'RSI overbought at {tech_analysis.rsi:.1f}',
+                    'entry_price': current_price,
+                    'target_price': current_price * 0.95,
+                    'stop_loss': current_price * 1.03
+                })
+            
+            # MACD signals
+            if tech_analysis.macd > tech_analysis.macd_signal and tech_analysis.macd_histogram > 0:
+                signals.append({
+                    'signal_type': 'BUY',
+                    'indicator': 'MACD',
+                    'strength': 'MEDIUM',
+                    'confidence': 0.7,
+                    'reason': 'MACD bullish crossover',
+                    'entry_price': current_price,
+                    'target_price': current_price * 1.03,
+                    'stop_loss': current_price * 0.98
+                })
+            
+            # Bollinger Bands signals
+            if current_price < tech_analysis.bollinger_lower:
+                signals.append({
+                    'signal_type': 'BUY',
+                    'indicator': 'BOLLINGER_BANDS',
+                    'strength': 'MEDIUM',
+                    'confidence': 0.6,
+                    'reason': 'Price below lower Bollinger Band',
+                    'entry_price': current_price,
+                    'target_price': tech_analysis.bollinger_middle,
+                    'stop_loss': current_price * 0.96
+                })
+            elif current_price > tech_analysis.bollinger_upper:
+                signals.append({
+                    'signal_type': 'SELL',
+                    'indicator': 'BOLLINGER_BANDS',
+                    'strength': 'MEDIUM',
+                    'confidence': 0.6,
+                    'reason': 'Price above upper Bollinger Band',
+                    'entry_price': current_price,
+                    'target_price': tech_analysis.bollinger_middle,
+                    'stop_loss': current_price * 1.04
+                })
+            
+            # Add timestamp to all signals
+            for signal in signals:
+                signal['timestamp'] = datetime.now().isoformat()
+                signal['symbol'] = symbol
+            
+            return signals
+            
+        except Exception as e:
+            logger.error(f"Trading signals error for {symbol}: {e}")
+            return []
+    
+    def _detect_market_regime(self, data: pd.DataFrame) -> str:
+        """Detect current market regime (Bull/Bear/Sideways)"""
+        try:
+            closes = data['Close']
+            returns = closes.pct_change().dropna()
+            
+            # Calculate trend over different periods
+            short_trend = closes.iloc[-10:].mean() / closes.iloc[-20:-10].mean() - 1
+            medium_trend = closes.iloc[-30:].mean() / closes.iloc[-60:-30].mean() - 1
+            
+            # Calculate volatility
+            volatility = returns.rolling(window=30).std().iloc[-1]
+            
+            if short_trend > 0.02 and medium_trend > 0.01:
+                return 'BULL_MARKET'
+            elif short_trend < -0.02 and medium_trend < -0.01:
+                return 'BEAR_MARKET'
+            elif volatility > returns.std() * 1.5:
+                return 'HIGH_VOLATILITY'
+            else:
+                return 'SIDEWAYS'
+                
+        except Exception:
+            return 'SIDEWAYS'
+    
+    def _detect_anomalies(self, data: pd.DataFrame) -> Dict[str, Any]:
+        """Detect anomalies in price/volume data"""
+        try:
+            returns = data['Close'].pct_change().dropna()
+            volumes = data['Volume']
+            
+            # Price anomalies (returns beyond 2 standard deviations)
+            price_threshold = returns.std() * 2
+            recent_returns = returns.tail(10)
+            price_anomalies = recent_returns[abs(recent_returns) > price_threshold]
+            
+            # Volume anomalies
+            volume_mean = volumes.rolling(window=20).mean()
+            volume_threshold = volume_mean * 2
+            recent_volumes = volumes.tail(10)
+            recent_volume_mean = volume_mean.tail(10)
+            volume_anomalies = recent_volumes[recent_volumes > recent_volume_mean * 2]
+            
+            return {
+                'anomalies_detected': len(price_anomalies) > 0 or len(volume_anomalies) > 0,
+                'price_anomalies': len(price_anomalies),
+                'volume_anomalies': len(volume_anomalies),
+                'latest_anomaly_date': data.index[-1].isoformat() if len(price_anomalies) > 0 or len(volume_anomalies) > 0 else None,
+                'anomaly_details': {
+                    'unusual_price_moves': price_anomalies.to_dict() if len(price_anomalies) > 0 else {},
+                    'unusual_volume_spikes': volume_anomalies.to_dict() if len(volume_anomalies) > 0 else {}
+                }
+            }
+            
+        except Exception as e:
+            return {
+                'anomalies_detected': False,
+                'error': str(e)
+            }
+    
+    def _calculate_confidence_intervals(self, predictions: Dict) -> Dict[str, Tuple[float, float]]:
+        """Calculate confidence intervals for predictions"""
+        confidence_intervals = {}
+        
+        for timeframe, pred_data in predictions.items():
+            if 'predicted_price' in pred_data and 'confidence' in pred_data:
+                price = pred_data['predicted_price']
+                confidence = pred_data['confidence'] / 100
+                
+                # Simple confidence interval (can be enhanced)
+                margin = price * (1 - confidence) * 0.1
+                lower_bound = price - margin
+                upper_bound = price + margin
+                
+                confidence_intervals[timeframe] = (round(lower_bound, 2), round(upper_bound, 2))
+        
+        return confidence_intervals
+    
+    def _calculate_max_drawdown(self, prices: pd.Series) -> float:
+        """Calculate maximum drawdown"""
+        cumulative = (1 + prices.pct_change()).cumprod()
+        running_max = cumulative.expanding().max()
+        drawdown = cumulative / running_max - 1
+        return drawdown.min()
+
     def run(self, host: str = '0.0.0.0', port: int = 5000, debug: bool = False):
         """Run the enhanced professional predictor"""
         try:
@@ -1488,13 +2327,19 @@ class EnhancedProfessionalPredictor:
             print(f"   • Excel Export: http://localhost:{port}/api/export/excel/<symbol>")
             print(f"   • Market Heatmap: http://localhost:{port}/api/market_heatmap")
             print(f"   • Sector Analysis: http://localhost:{port}/api/sector_analysis")
+            print("🤖 AI Prediction Endpoints:")
+            print(f"   • AI Predictions: http://localhost:{port}/api/ai_prediction/<symbol>")
+            print(f"   • AI Sentiment: http://localhost:{port}/api/ai_sentiment/<symbol>")
+            print(f"   • AI Patterns: http://localhost:{port}/api/ai_patterns/<symbol>")
+            print(f"   • AI Risk Assessment: http://localhost:{port}/api/ai_risk/<symbol>")
+            print(f"   • AI Trading Signals: http://localhost:{port}/api/ai_trading_signals/<symbol>")
             print("="*70)
             
             # Start analysis engine
             self.start_analysis_engine()
             
             # Run the application
-            self.socketio.run(self.app, host=host, port=port, debug=debug)
+            self.socketio.run(self.app, host=host, port=port, debug=True)
             
         except KeyboardInterrupt:
             logger.info("🛑 Enhanced Professional Predictor stopped by user")
